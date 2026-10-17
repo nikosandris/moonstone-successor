@@ -93,36 +93,47 @@ async function fetchPicks(): Promise<void> {
   await MeshoptEncoder.ready;
   const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({ 'meshopt.encoder': MeshoptEncoder });
   const sharp = (await import('sharp')).default;
+  const failed: string[] = [];
   for (const [role, uid] of Object.entries(picks)) {
-    const info = await getJson(`${API}/models/${uid}`);
-    const dl = await getJson(`${API}/models/${uid}/download`, token);
-    const tmp = join('/tmp', `sf_${uid}`);
-    rmSync(tmp, { recursive: true, force: true });
-    mkdirSync(tmp, { recursive: true });
-    let doc;
-    if (dl.glb?.url) {
-      await download(dl.glb.url, join(tmp, 'm.glb'));
-      doc = await io.read(join(tmp, 'm.glb'));
-    } else {
-      await download(dl.gltf.url, join(tmp, 'm.zip'));
-      execFileSync('unzip', ['-q', '-o', join(tmp, 'm.zip'), '-d', tmp]);
-      const gltf = findFile(tmp, (f) => f.endsWith('.gltf') || f.endsWith('.glb'));
-      if (!gltf) throw new Error(`no gltf in ${uid}`);
-      doc = await io.read(gltf);
+    try {
+      credits.push(await fetchOne(role, uid, token, io, sharp));
+    } catch (e) {
+      console.error(`${role} (${uid}) failed: ${String(e)}`);
+      failed.push(role);
     }
-    await doc.transform(
-      dedup(), resample(), prune(),
-      textureCompress({ encoder: sharp, targetFormat: 'webp', resize: [1024, 1024] }),
-      meshopt({ encoder: MeshoptEncoder, level: 'medium' }),
-    );
-    const bytes = await io.writeBinary(doc);
-    writeFileSync(join(OUT, `${role}.glb`), bytes);
-    const clips = doc.getRoot().listAnimations().map((a) => a.getName());
-    writeFileSync(join(OUT, `${role}.json`), JSON.stringify({ uid, name: info.name, author: info.user?.displayName, license: info.license?.label, url: info.viewerUrl, clips }, null, 2));
-    credits.push(`- **${role}**: "${info.name}" by ${info.user?.displayName} (${info.license?.label}) - ${info.viewerUrl}`);
-    console.log(`${role}: ${(bytes.length / 1024).toFixed(0)} KB, clips: ${clips.join(', ')}`);
   }
   writeFileSync(join(OUT, 'CREDITS.md'), `# Sketchfab models\n\n${credits.join('\n')}\n`);
+  if (failed.length) console.log(`failed: ${failed.join(', ')}`);
+}
+
+async function fetchOne(role: string, uid: string, token: string, io: NodeIO, sharp: any): Promise<string> {
+  const info = await getJson(`${API}/models/${uid}`);
+  const dl = await getJson(`${API}/models/${uid}/download`, token);
+  const tmp = join('/tmp', `sf_${uid}`);
+  rmSync(tmp, { recursive: true, force: true });
+  mkdirSync(tmp, { recursive: true });
+  let doc;
+  if (dl.glb?.url) {
+    await download(dl.glb.url, join(tmp, 'm.glb'));
+    doc = await io.read(join(tmp, 'm.glb'));
+  } else {
+    await download(dl.gltf.url, join(tmp, 'm.zip'));
+    execFileSync('unzip', ['-q', '-o', join(tmp, 'm.zip'), '-d', tmp]);
+    const gltf = findFile(tmp, (f) => f.endsWith('.gltf') || f.endsWith('.glb'));
+    if (!gltf) throw new Error(`no gltf in ${uid}`);
+    doc = await io.read(gltf);
+  }
+  await doc.transform(
+    dedup(), resample(), prune(),
+    textureCompress({ encoder: sharp, targetFormat: 'webp', resize: [1024, 1024] }),
+    meshopt({ encoder: MeshoptEncoder, level: 'medium' }),
+  );
+  const bytes = await io.writeBinary(doc);
+  writeFileSync(join(OUT, `${role}.glb`), bytes);
+  const clips = doc.getRoot().listAnimations().map((a) => a.getName());
+  writeFileSync(join(OUT, `${role}.json`), JSON.stringify({ uid, name: info.name, author: info.user?.displayName, license: info.license?.label, url: info.viewerUrl, clips }, null, 2));
+  console.log(`${role}: ${(bytes.length / 1024).toFixed(0)} KB, clips: ${clips.join(', ')}`);
+  return `- **${role}**: "${info.name}" by ${info.user?.displayName} (${info.license?.label}) - ${info.viewerUrl}`;
 }
 
 const mode = process.argv[2];
