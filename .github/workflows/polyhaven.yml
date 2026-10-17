@@ -9,6 +9,10 @@ on:
         default: scout
         type: choice
         options: [scout, fetch, probe]
+      only:
+        description: optional comma-separated model names to refresh (fetch only)
+        required: false
+        default: ''
 
 permissions:
   contents: write
@@ -23,7 +27,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npx tsx scripts/polyhaven.ts ${{ inputs.mode }}
+      - run: npx tsx scripts/polyhaven.ts ${{ inputs.mode }} ${{ inputs.only }}
       - name: Commit results
         run: |
           git config user.name "github-actions[bot]"

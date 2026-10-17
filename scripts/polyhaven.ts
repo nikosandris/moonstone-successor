@@ -71,6 +71,9 @@ interface Picks { textures?: Record<string, string>; hdri?: Record<string, strin
 
 async function fetchPicks(): Promise<void> {
   const picks = JSON.parse(readFileSync(join(DIR, 'picks.json'), 'utf8')) as Picks;
+  // `fetch <name,name>` refreshes only those models
+  const only = process.argv[3]?.split(',');
+  if (only) { picks.textures = {}; picks.hdri = {}; picks.models = Object.fromEntries(Object.entries(picks.models ?? {}).filter(([k]) => only.includes(k))); }
   mkdirSync(OUT, { recursive: true });
   const sharp = (await import('sharp')).default;
   const credits: string[] = [];
@@ -105,6 +108,27 @@ async function fetchPicks(): Promise<void> {
     const json = JSON.parse(new TextDecoder().decode(await getBytes(g.url)));
     const resources: Record<string, Uint8Array<ArrayBuffer>> = {};
     for (const [path, inc] of Object.entries(g.include ?? {})) resources[path] = await getBytes((inc as { url: string }).url);
+    // foliage: Poly Haven ships the leaf cut-out as a separate <part>_alpha map; fold it into the colour
+    // texture's alpha channel so the leaves render as alpha-tested cards
+    for (const mat of json.materials ?? []) {
+      if (mat.alphaMode !== 'BLEND' && mat.alphaMode !== 'MASK') continue;
+      const tex = json.textures?.[mat.pbrMetallicRoughness?.baseColorTexture?.index];
+      const uri: string | undefined = tex !== undefined ? json.images?.[tex.source]?.uri : undefined;
+      const part = uri?.match(new RegExp(`${id}_(.+)_diff`))?.[1];
+      const alpha = part ? files[`${part}_alpha`]?.['1k'] : null;
+      const aurl = alpha?.png?.url ?? alpha?.jpg?.url;
+      if (!uri || !aurl) { console.warn(`  ${id}: no alpha map for ${mat.name}`); continue; }
+      const a = await sharp(await getBytes(aurl)).greyscale().resize(1024, 1024).raw().toBuffer();
+      const rgba = await sharp(resources[uri]).resize(1024, 1024).joinChannel(a, { raw: { width: 1024, height: 1024, channels: 1 } }).png().toBuffer();
+      const png = uri.replace(/\.jpg$/, '.png');
+      resources[png] = new Uint8Array(rgba);
+      json.images[tex.source].uri = png;
+      json.images[tex.source].mimeType = 'image/png';
+      mat.alphaMode = 'MASK';
+      mat.alphaCutoff = 0.4;
+      mat.doubleSided = true;
+      console.log(`  ${id}: merged ${part}_alpha`);
+    }
     const doc = await io.readJSON({ json, resources });
     // scanned models are dense: simplify toward a triangle budget so dozens can be instanced
     let tris = 0;
@@ -119,7 +143,7 @@ async function fetchPicks(): Promise<void> {
     credits.push(`- model **${name}**: Poly Haven "${id}" (CC0) - https://polyhaven.com/a/${id}`);
     console.log(`model ${name} <- ${id}: ${(bytes.length / 1024).toFixed(0)} KB`);
   }
-  writeFileSync(join(OUT, 'CREDITS.md'), `# Poly Haven assets (CC0)\n\n${credits.join('\n')}\n`);
+  if (!only) writeFileSync(join(OUT, 'CREDITS.md'), `# Poly Haven assets (CC0)\n\n${credits.join('\n')}\n`);
 }
 
 /** Dump the file listing of a few assets (to inspect how Poly Haven packages them). */
