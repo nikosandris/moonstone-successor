@@ -50,7 +50,8 @@ function buffSlot(k: Knight): number {
   });
 }
 
-export function botAction(s: GameState): Action {
+/** `side` forces which combat side the bot decides for (used by the UI for duels with hidden choices). */
+export function botAction(s: GameState, side?: 'a' | 'b'): Action {
   const k = s.players[actorId(s)];
   switch (s.stage) {
     case 'roll': {
@@ -65,7 +66,7 @@ export function botAction(s: GameState): Action {
     case 'shop':
       return shopAction(k);
     case 'combat':
-      return combatAction(s);
+      return combatAction(s, side);
     case 'pvpOffer': {
       const maxHp = effectiveStats(k).maxHp;
       const closeToWin = sealCount(s, k.id) >= CONFIG.sealsToEnter;
@@ -198,10 +199,10 @@ function shopAction(k: Knight): Action {
 
 // ---------------------------------------------------------------- combat
 
-function combatAction(s: GameState): Action {
+function combatAction(s: GameState, forced?: 'a' | 'b'): Action {
   const c = s.combat!;
   if (c.over) return { type: 'continue' };
-  const side: 'a' | 'b' = c.choiceA === null ? 'a' : 'b';
+  const side: 'a' | 'b' = forced ?? (c.choiceA === null ? 'a' : 'b');
   const k = side === 'a' ? s.players[c.a] : s.players[c.b!];
   const { a, b } = combatFighters(s);
   const me = side === 'a' ? a : b;

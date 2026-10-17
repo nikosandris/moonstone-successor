@@ -525,6 +525,32 @@ function finishCombat(s: GameState): void {
   afterEncounter(s);
 }
 
+// ---------------------------------------------------------------- queries (used by UI, bot and reducer)
+
+/** Why a knight cannot buy `itemId` right now, or null if the purchase is fine. */
+export function buyCheck(k: Knight, itemId: string): string | null {
+  const nd = node(k.pos);
+  if (!nd.stock || !nd.stock.includes(itemId)) return 'Not sold here';
+  const item = getItem(itemId);
+  if (k.gold < shopPrice(k, item.price)) return 'Not enough gold';
+  if (item.kind === 'consumable') return k.consumables.length >= 3 ? 'Pack is full' : null;
+  const cur = item.kind === 'weapon' ? k.weapon : k.armor;
+  return (item.bonus ?? 0) > (cur ? getItem(cur).bonus ?? 0 : -1) ? null : 'No upgrade';
+}
+
+/** How much healing the knight can buy in a village and what it costs. */
+export function healQuote(k: Knight): { hp: number; cost: number } {
+  const missing = effectiveStats(k).maxHp - k.hp;
+  const unit = (CONFIG.healCostPerHp * (100 + effectiveStats(k).shopPct)) / 100;
+  const hp = Math.max(0, Math.min(missing, Math.floor(k.gold / unit)));
+  return { hp, cost: Math.ceil(hp * unit) };
+}
+
+export function canFlee(s: GameState): boolean {
+  const c = s.combat;
+  return !!c && !c.over && c.kind !== 'pvp' && c.round === 0 && c.choiceA === null;
+}
+
 // ---------------------------------------------------------------- reducer
 
 function need(cond: boolean, msg: string): asserts cond {
@@ -604,38 +630,29 @@ export function applyAction(state: GameState, action: Action): GameState {
 
     case 'buy': {
       need(s.stage === 'shop', 'not in a shop');
-      const nd = node(k.pos);
-      need(!!nd.stock && nd.stock.includes(action.itemId), 'not sold here');
+      const why = buyCheck(k, action.itemId);
+      need(why === null, why ?? '');
       const item = getItem(action.itemId);
       const price = shopPrice(k, item.price);
-      need(k.gold >= price, 'not enough gold');
-      if (item.kind === 'consumable') {
-        need(k.consumables.length < 3, 'pack is full');
-        k.consumables.push(item.id);
-        log(s, `${k.name} buys ${item.name} for ${price}g.`);
-      } else {
+      if (item.kind === 'consumable') k.consumables.push(item.id);
+      else {
         const cur = item.kind === 'weapon' ? k.weapon : k.armor;
-        need((item.bonus ?? 0) > (cur ? getItem(cur).bonus ?? 0 : -1), 'no upgrade');
         if (cur) k.gold += sellValue(getItem(cur));
         if (item.kind === 'weapon') k.weapon = item.id;
         else k.armor = item.id;
-        log(s, `${k.name} buys ${item.name} for ${price}g.`);
       }
       k.gold -= price;
+      log(s, `${k.name} buys ${item.name} for ${price}g.`);
       return s;
     }
 
     case 'heal': {
       need(s.stage === 'shop', 'not in a shop');
-      const missing = effectiveStats(k).maxHp - k.hp;
-      need(missing > 0, 'already at full health');
-      const unit = (CONFIG.healCostPerHp * (100 + effectiveStats(k).shopPct)) / 100;
-      const hp = Math.min(missing, Math.floor(k.gold / unit));
-      need(hp > 0, 'cannot afford healing');
-      const cost = Math.ceil(hp * unit);
-      k.gold -= cost;
-      k.hp += hp;
-      log(s, `${k.name} pays ${cost}g for ${hp} HP of healing.`);
+      const q = healQuote(k);
+      need(q.hp > 0, 'nothing to heal or cannot afford it');
+      k.gold -= q.cost;
+      k.hp += q.hp;
+      log(s, `${k.name} pays ${q.cost}g for ${q.hp} HP of healing.`);
       return s;
     }
 
@@ -650,10 +667,7 @@ export function applyAction(state: GameState, action: Action): GameState {
     }
 
     case 'flee': {
-      need(s.stage === 'combat' && !!s.combat && !s.combat.over, 'no fight to flee');
-      const c = s.combat!;
-      need(c.kind !== 'pvp', 'cannot flee a duel');
-      need(c.round === 0 && c.choiceA === null, 'too late to flee');
+      need(canFlee(s), 'cannot flee now');
       const cost = fleeCost(k);
       k.gold -= cost;
       k.buffs.freeFlee = false;

@@ -25,10 +25,10 @@ export const BOARD: BoardData = {
     n(7, 'lair', 'Rust Keep', 500, 530, { seal: 2, monster: 'rustKnight' }),
     n(8, 'lair', 'Drake Cave', 100, 300, { seal: 3, monster: 'caveDrake' }),
     // Villages near the homes
-    n(9, 'village', 'Ashford', 230, 70, { stock: ['sword1', 'sword2', 'studded', 'scale', 'potionS', 'whetstone'] }),
-    n(10, 'village', 'Brindle', 770, 70, { stock: ['axe1', 'warhammer', 'chain', 'plate', 'potionS', 'tonic'] }),
-    n(11, 'village', 'Cinder Mill', 770, 530, { stock: ['spear1', 'halberd', 'studded', 'scale', 'potionL', 'brew'] }),
-    n(12, 'village', 'Dunmere', 230, 530, { stock: ['mace', 'sword2', 'chain', 'plate', 'potionL', 'smoke'] }),
+    n(9, 'village', 'Ashford', 230, 70, { stock: ['sword1', 'sword2', 'chain', 'scale', 'potionS', 'whetstone'] }),
+    n(10, 'village', 'Brindle', 770, 70, { stock: ['axe1', 'warhammer', 'chain', 'scale', 'potionS', 'tonic'] }),
+    n(11, 'village', 'Cinder Mill', 770, 530, { stock: ['spear1', 'sword2', 'chain', 'scale', 'potionL', 'brew'] }),
+    n(12, 'village', 'Dunmere', 230, 530, { stock: ['sword1', 'warhammer', 'chain', 'scale', 'potionL', 'smoke'] }),
     // Roads and ruins
     n(13, 'road', 'North Road', 500, 170),
     n(14, 'ruins', 'Sunken Crypt', 620, 300),

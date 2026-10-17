@@ -28,7 +28,7 @@ export const MONSTERS: Record<string, MonsterDef> = {
 };
 
 export const GUARDIAN: MonsterDef = {
-  id: 'guardian', name: 'Hollow Warden', hp: 64, attack: 9, defense: 5, stamina: 14,
+  id: 'guardian', name: 'Hollow Warden', hp: 62, attack: 9, defense: 5, stamina: 14,
   weights: { strike: 36, guard: 28, feint: 36 }, opener: 'guard', habit: 'adaptive',
   goldMin: 0, goldMax: 0, lootTier: 4,
   hint: 'The Sanctum guardian. Adapts to your habits - vary your moves.',
