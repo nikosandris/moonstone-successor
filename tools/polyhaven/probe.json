@@ -1,0 +1,510 @@
+{
+  "fir_tree_01": {
+    "keys": [
+      "blend",
+      "bark_ao",
+      "bark_arm",
+      "bark_diff",
+      "bark_disp",
+      "bark_nor_dx",
+      "bark_nor_gl",
+      "bark_rough",
+      "trunk_a_ao",
+      "trunk_a_arm",
+      "trunk_a_diff",
+      "trunk_a_nor_dx",
+      "trunk_a_nor_gl",
+      "trunk_a_rough",
+      "trunk_b_ao",
+      "trunk_b_arm",
+      "trunk_b_diff",
+      "trunk_b_nor_dx",
+      "trunk_b_nor_gl",
+      "trunk_b_rough",
+      "trunk_c_ao",
+      "trunk_c_arm",
+      "trunk_c_diff",
+      "trunk_c_nor_dx",
+      "trunk_c_nor_gl",
+      "trunk_c_rough",
+      "twig_alpha",
+      "twig_ao",
+      "twig_arm",
+      "twig_diff",
+      "twig_mask",
+      "twig_nor_dx",
+      "twig_nor_gl",
+      "twig_rough",
+      "fbx",
+      "gltf",
+      "usd"
+    ],
+    "gltfInclude": [
+      "textures/fir_tree_01_bark_nor_gl_1k.jpg",
+      "textures/fir_tree_01_bark_diff_1k.jpg",
+      "textures/fir_tree_01_bark_arm_1k.jpg",
+      "textures/fir_tree_01_trunk_a_nor_gl_1k.jpg",
+      "textures/fir_tree_01_trunk_a_diff_1k.jpg",
+      "textures/fir_tree_01_trunk_a_arm_1k.jpg",
+      "textures/fir_tree_01_twig_nor_gl_1k.jpg",
+      "textures/fir_tree_01_twig_diff_1k.jpg",
+      "textures/fir_tree_01_twig_arm_1k.jpg",
+      "textures/fir_tree_01_trunk_b_nor_gl_1k.jpg",
+      "textures/fir_tree_01_trunk_b_diff_1k.jpg",
+      "textures/fir_tree_01_trunk_b_arm_1k.jpg",
+      "fir_tree_01.bin"
+    ]
+  },
+  "fir_tree_01_materials": [
+    {
+      "doubleSided": true,
+      "extensions": {
+        "KHR_materials_specular": {
+          "specularFactor": 0.04676615074276924
+        },
+        "KHR_materials_ior": {
+          "ior": 1.4500000476837158
+        }
+      },
+      "name": "fir_tree_01_bark",
+      "normalTexture": {
+        "extensions": {
+          "KHR_texture_transform": {
+            "offset": [
+              0,
+              0.9000000655651093
+            ],
+            "scale": [
+              1.2000000476837158,
+              0.09999993443489075
+            ]
+          }
+        },
+        "index": 0
+      },
+      "pbrMetallicRoughness": {
+        "baseColorTexture": {
+          "extensions": {
+            "KHR_texture_transform": {
+              "offset": [
+                0,
+                0.9000000655651093
+              ],
+              "scale": [
+                1.2000000476837158,
+                0.09999993443489075
+              ]
+            }
+          },
+          "index": 1
+        },
+        "metallicFactor": 0,
+        "metallicRoughnessTexture": {
+          "extensions": {
+            "KHR_texture_transform": {
+              "offset": [
+                0,
+                0.9000000655651093
+              ],
+              "scale": [
+                1.2000000476837158,
+                0.09999993443489075
+              ]
+            }
+          },
+          "index": 2
+        }
+      }
+    },
+    {
+      "doubleSided": true,
+      "extensions": {
+        "KHR_materials_specular": {
+          "specularFactor": 0.4000000059604645
+        },
+        "KHR_materials_ior": {
+          "ior": 1.4500000476837158
+        }
+      },
+      "name": "fir_tree_01_trunk_a",
+      "normalTexture": {
+        "index": 3
+      },
+      "pbrMetallicRoughness": {
+        "baseColorTexture": {
+          "index": 4
+        },
+        "metallicFactor": 0,
+        "metallicRoughnessTexture": {
+          "index": 5
+        }
+      }
+    },
+    {
+      "alphaMode": "BLEND",
+      "doubleSided": true,
+      "extensions": {
+        "KHR_materials_specular": {
+          "specularFactor": 0
+        },
+        "KHR_materials_ior": {
+          "ior": 1.4500000476837158
+        }
+      },
+      "name": "fir_tree_01_twig",
+      "normalTexture": {
+        "index": 6
+      },
+      "pbrMetallicRoughness": {
+        "baseColorTexture": {
+          "index": 7
+        },
+        "metallicFactor": 0,
+        "metallicRoughnessTexture": {
+          "index": 8
+        }
+      }
+    },
+    {
+      "doubleSided": true,
+      "name": "fir_tree_01_dead_branches",
+      "normalTexture": {
+        "index": 9
+      },
+      "pbrMetallicRoughness": {
+        "baseColorTexture": {
+          "index": 10
+        },
+        "metallicFactor": 0,
+        "metallicRoughnessTexture": {
+          "index": 11
+        }
+      }
+    },
+    {
+      "doubleSided": true,
+      "extensions": {
+        "KHR_materials_specular": {
+          "specularFactor": 0.4000000059604645
+        },
+        "KHR_materials_ior": {
+          "ior": 1.4500000476837158
+        }
+      },
+      "name": "fir_tree_01_trunk_b",
+      "normalTexture": {
+        "index": 12
+      },
+      "pbrMetallicRoughness": {
+        "baseColorTexture": {
+          "index": 13
+        },
+        "metallicFactor": 0,
+        "metallicRoughnessTexture": {
+          "index": 14
+        }
+      }
+    },
+    {
+      "doubleSided": true,
+      "extensions": {
+        "KHR_materials_specular": {
+          "specularFactor": 0.4000000059604645
+        },
+        "KHR_materials_ior": {
+          "ior": 1.4500000476837158
+        }
+      },
+      "name": "fir_tree_01_trunk_c",
+      "normalTexture": {
+        "extensions": {
+          "KHR_texture_transform": {
+            "offset": [
+              0,
+              -0.3999999761581421
+            ],
+            "scale": [
+              1.399999976158142,
+              1.399999976158142
+            ]
+          }
+        },
+        "index": 15
+      },
+      "pbrMetallicRoughness": {
+        "baseColorTexture": {
+          "extensions": {
+            "KHR_texture_transform": {
+              "offset": [
+                0,
+                -0.3999999761581421
+              ],
+              "scale": [
+                1.399999976158142,
+                1.399999976158142
+              ]
+            }
+          },
+          "index": 16
+        },
+        "metallicFactor": 0,
+        "metallicRoughnessTexture": {
+          "extensions": {
+            "KHR_texture_transform": {
+              "offset": [
+                0,
+                -0.3999999761581421
+              ],
+              "scale": [
+                1.399999976158142,
+                1.399999976158142
+              ]
+            }
+          },
+          "index": 17
+        }
+      }
+    }
+  ],
+  "fir_tree_01_images": [
+    {
+      "mimeType": "image/jpeg",
+      "name": "fir_tree_01_bark_nor_gl",
+      "uri": "textures/fir_tree_01_bark_nor_gl_1k.jpg"
+    },
+    {
+      "mimeType": "image/jpeg",
+      "name": "fir_tree_01_bark_diff",
+      "uri": "textures/fir_tree_01_bark_diff_1k.jpg"
+    },
+    {
+      "mimeType": "image/jpeg",
+      "name": "fir_tree_01_bark_rough",
+      "uri": "textures/fir_tree_01_bark_arm_1k.jpg"
+    },
+    {
+      "mimeType": "image/jpeg",
+      "name": "fir_tree_01_trunk_a_nor_gl",
+      "uri": "textures/fir_tree_01_trunk_a_nor_gl_1k.jpg"
+    },
+    {
+      "mimeType": "image/jpeg",
+      "name": "fir_tree_01_trunk_a_diff",
+      "uri": "textures/fir_tree_01_trunk_a_diff_1k.jpg"
+    },
+    {
+      "mimeType": "image/jpeg",
+      "name": "fir_tree_01_trunk_a_rough",
+      "uri": "textures/fir_tree_01_trunk_a_arm_1k.jpg"
+    },
+    {
+      "mimeType": "image/jpeg",
+      "name": "fir_tree_01_twig_nor_gl",
+      "uri": "textures/fir_tree_01_twig_nor_gl_1k.jpg"
+    },
+    {
+      "mimeType": "image/jpeg",
+      "name": "fir_tree_01_twig_diff-fir_tree_01_twig_alpha",
+      "uri": "textures/fir_tree_01_twig_diff_1k.jpg"
+    },
+    {
+      "mimeType": "image/jpeg",
+      "name": "fir_tree_01_twig_rough",
+      "uri": "textures/fir_tree_01_twig_arm_1k.jpg"
+    },
+    {
+      "mimeType": "image/jpeg",
+      "name": "fir_tree_01_trunk_b_nor_gl",
+      "uri": "textures/fir_tree_01_trunk_b_nor_gl_1k.jpg"
+    },
+    {
+      "mimeType": "image/jpeg",
+      "name": "fir_tree_01_trunk_b_diff",
+      "uri": "textures/fir_tree_01_trunk_b_diff_1k.jpg"
+    },
+    {
+      "mimeType": "image/jpeg",
+      "name": "fir_tree_01_trunk_b_rough",
+      "uri": "textures/fir_tree_01_trunk_b_arm_1k.jpg"
+    }
+  ],
+  "tree_small_02": {
+    "keys": [
+      "blend",
+      "AO",
+      "arm",
+      "branch_ao",
+      "branch_arm",
+      "branch_diff",
+      "branch_disp",
+      "branch_nor_dx",
+      "branch_nor_gl",
+      "branch_rough",
+      "Diffuse",
+      "Displacement",
+      "leaves_alpha",
+      "leaves_ao",
+      "leaves_arm",
+      "leaves_diff",
+      "leaves_disp",
+      "leaves_nor_dx",
+      "leaves_nor_gl",
+      "leaves_rough",
+      "nor_dx",
+      "nor_gl",
+      "Rough",
+      "fbx",
+      "gltf",
+      "usd"
+    ],
+    "gltfInclude": [
+      "textures/tree_small_02_branch_nor_gl_1k.jpg",
+      "textures/tree_small_02_branch_diff_1k.jpg",
+      "textures/tree_small_02_branch_arm_1k.jpg",
+      "textures/tree_small_02_leaves_nor_gl_1k.jpg",
+      "textures/tree_small_02_leaves_diff_1k.jpg",
+      "textures/tree_small_02_leaves_arm_1k.jpg",
+      "textures/tree_small_02_nor_gl_1k.jpg",
+      "textures/tree_small_02_diff_1k.jpg",
+      "textures/tree_small_02_arm_1k.jpg",
+      "tree_small_02.bin"
+    ]
+  },
+  "tree_small_02_materials": [
+    {
+      "doubleSided": true,
+      "name": "tree_small_02_branches",
+      "normalTexture": {
+        "extensions": {
+          "KHR_texture_transform": {
+            "offset": [
+              0,
+              0.40000009536743164
+            ],
+            "scale": [
+              3,
+              0.5999999046325684
+            ]
+          }
+        },
+        "index": 0,
+        "texCoord": 1
+      },
+      "pbrMetallicRoughness": {
+        "baseColorTexture": {
+          "extensions": {
+            "KHR_texture_transform": {
+              "offset": [
+                0,
+                0.40000009536743164
+              ],
+              "scale": [
+                3,
+                0.5999999046325684
+              ]
+            }
+          },
+          "index": 1,
+          "texCoord": 1
+        },
+        "metallicFactor": 0,
+        "metallicRoughnessTexture": {
+          "extensions": {
+            "KHR_texture_transform": {
+              "offset": [
+                0,
+                0.40000009536743164
+              ],
+              "scale": [
+                3,
+                0.5999999046325684
+              ]
+            }
+          },
+          "index": 2,
+          "texCoord": 1
+        }
+      }
+    },
+    {
+      "alphaMode": "BLEND",
+      "doubleSided": true,
+      "name": "tree_small_02_leaves",
+      "normalTexture": {
+        "index": 3
+      },
+      "pbrMetallicRoughness": {
+        "baseColorTexture": {
+          "index": 4
+        },
+        "metallicFactor": 0,
+        "metallicRoughnessTexture": {
+          "index": 5
+        }
+      }
+    },
+    {
+      "doubleSided": true,
+      "name": "tree_small_02_trunk",
+      "normalTexture": {
+        "index": 6
+      },
+      "pbrMetallicRoughness": {
+        "baseColorTexture": {
+          "index": 7
+        },
+        "metallicFactor": 0,
+        "metallicRoughnessTexture": {
+          "index": 8
+        }
+      }
+    }
+  ],
+  "tree_small_02_images": [
+    {
+      "mimeType": "image/jpeg",
+      "name": "tree_small_02_branch_nor_gl",
+      "uri": "textures/tree_small_02_branch_nor_gl_1k.jpg"
+    },
+    {
+      "mimeType": "image/jpeg",
+      "name": "tree_small_02_branch_diff",
+      "uri": "textures/tree_small_02_branch_diff_1k.jpg"
+    },
+    {
+      "mimeType": "image/jpeg",
+      "name": "tree_small_02_branch_rough",
+      "uri": "textures/tree_small_02_branch_arm_1k.jpg"
+    },
+    {
+      "mimeType": "image/jpeg",
+      "name": "tree_small_02_leaves_nor_gl",
+      "uri": "textures/tree_small_02_leaves_nor_gl_1k.jpg"
+    },
+    {
+      "mimeType": "image/jpeg",
+      "name": "tree_small_02_leaves_diff-tree_small_02_leaves_alpha",
+      "uri": "textures/tree_small_02_leaves_diff_1k.jpg"
+    },
+    {
+      "mimeType": "image/jpeg",
+      "name": "tree_small_02_leaves_rough",
+      "uri": "textures/tree_small_02_leaves_arm_1k.jpg"
+    },
+    {
+      "mimeType": "image/jpeg",
+      "name": "tree_small_02_nor_gl",
+      "uri": "textures/tree_small_02_nor_gl_1k.jpg"
+    },
+    {
+      "mimeType": "image/jpeg",
+      "name": "tree_small_02_diff",
+      "uri": "textures/tree_small_02_diff_1k.jpg"
+    },
+    {
+      "mimeType": "image/jpeg",
+      "name": "tree_small_02_rough",
+      "uri": "textures/tree_small_02_arm_1k.jpg"
+    }
+  ]
+}
