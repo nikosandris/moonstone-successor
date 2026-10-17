@@ -32,4 +32,5 @@ jobs:
           if [ -d public/assets/ph ]; then git add -A public/assets/ph; fi
           git diff --cached --quiet && exit 0
           git commit -m "Poly Haven ${{ inputs.mode }} results"
+          git pull --rebase origin "${GITHUB_REF_NAME}"
           git push
