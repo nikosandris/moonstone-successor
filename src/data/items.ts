@@ -23,7 +23,7 @@ export const ITEMS: ItemDef[] = [
   W('runeblade', 'Runeblade', 4, 260, 9),
   // Armors (9)
   A('paddedCoat', 'Padded Coat', 0, 5, 1),
-  A('jerkin', 'Leather Jerkin', 1, 25, 1),
+  A('jerkin', 'Leather Jerkin', 1, 30, 2),
   A('leatherVest', 'Boiled Vest', 1, 35, 2),
   A('hide', 'Hide Armor', 1, 40, 2),
   A('studded', 'Studded Coat', 2, 65, 3),

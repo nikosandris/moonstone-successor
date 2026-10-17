@@ -93,3 +93,19 @@
 - `npm test`: 120 pass (new: save round-trip, cleared on game over, corrupt saves ignored).
 - `npm run build`: 0 errors. Rules unchanged since M5 (sim: Sanctum 80.0%, 22.6 days, max seat 26.7%).
 - Playwright desktop + 800x360 touch: rules overlay, tutorial steps 1-5 (roll advances it), Menu with Very fast (timeScale 2 applied), reload -> Resume restores an identical state. 0 console errors. Screenshots inspected.
+
+## M7 - Final pass (done)
+
+**Changed**
+- Performance: measured CPU cost per frame at 800x360 (headless Chromium, software WebGL): map 1.5 ms average (2.5 ms max), arena idle 3.4 ms, arena mid-fight 4.3 ms average (8.6 ms max); a full UI rebuild after an action takes about 12 ms. Heap about 29 MB. Light2D `maxLights` raised to 16.
+- Accessibility: 12 px minimum text, reflowed side panel (short item labels, Seals/Scars/Renown compacted), brighter low-contrast text, keyboard Space/Enter for roll and end turn (shown on the buttons).
+- Balance: Leather Jerkin now +2 Defense (was never used).
+- README and docs/rules.md rewritten for all Phase 2 features; final sim report regenerated.
+
+**Verification**
+- `npm test`: 120 pass. `npm run build`: 0 errors.
+- `npm run sim` (seeds 1-1000): Sanctum 80.3%, average 22.5 days, seats 26.6 / 25.7 / 23.6 / 24.1%. Every item is used at least once.
+- Playwright desktop + 800x360 touch: map, panel, events, level-up, summary, lair arena fight to the end on touch, two-human keyboard duel, Space-to-roll; full 4-bot games in both Arena and Classic mode end without stalls. 0 console errors. Screenshots inspected.
+
+**Known issues**
+- Frame-rate on real phones and GPUs, and the actual sound, could not be checked from the headless test environment.

@@ -41,6 +41,10 @@ const my = (y: number) => MAP_Y + y * MAP_SCALE;
 
 const PANEL_X = 700;
 
+const SHORT_ITEM: Record<string, string> = {
+  potionS: 'Heal +12', potionL: 'Heal +28', whetstone: 'Whetstone', tonic: 'Iron Tonic', brew: 'Vigor Brew', boots: 'Boots +3', smoke: 'Smoke Bomb',
+};
+
 const CHOICE_INFO: Record<Choice, { label: string; beats: string }> = {
   strike: { label: 'Strike', beats: 'beats Feint' },
   guard: { label: 'Guard', beats: 'beats Strike' },
@@ -106,6 +110,14 @@ export class GameScene extends Phaser.Scene {
     // ?speed=N shortens bot delays (used for automated checks)
     this.applySpeed();
     onSettings(() => this.applySpeed());
+    // keyboard: Space/Enter rolls the die or ends the turn
+    this.input.keyboard?.on('keydown', (e: KeyboardEvent) => {
+      if (e.key !== ' ' && e.key !== 'Enter') return;
+      const s = this.state;
+      if (this.actor.bot || this.tutStep >= 0 && this.tutStep < 3) return;
+      if (s.stage === 'roll') this.dispatch({ type: 'roll' });
+      else if (s.stage === 'turnEnd') this.dispatch({ type: 'endTurn' });
+    });
     this.lastPos = this.state.players.map((p) => p.pos);
     this.render();
   }
@@ -500,46 +512,40 @@ export class GameScene extends Phaser.Scene {
     addText(this, L, x0 + 4, y0 + 96, `Weapon: ${wep ? `${wep.name} (${wep.desc})` : 'none'}`, { size: 14 });
     addText(this, L, x0 + 4, y0 + 114, `Armor:  ${arm ? `${arm.name} (${arm.desc})` : 'none'}`, { size: 14 });
 
-    // consumables
-    const cy = y0 + 138;
+    // consumables (short labels so they stay one line at the 12 px minimum)
+    const cy = y0 + 136;
     const canUse = s.stage === 'roll' && !k.bot;
     for (let i = 0; i < 3; i++) {
       const id = k.consumables[i];
       if (id) {
-        const it = getItem(id);
-        addButton(this, L, x0 + 4 + i * 104, cy, 100, 38, it.name, () => this.dispatch({ type: 'useItem', slot: i }), { size: 12, enabled: canUse, fill: 0x2e4a7a });
+        addButton(this, L, x0 + 4 + i * 104, cy, 100, 34, SHORT_ITEM[id] ?? getItem(id).name, () => this.dispatch({ type: 'useItem', slot: i }), { size: 13, enabled: canUse, fill: 0x2e4a7a });
       } else {
-        addPanel(this, L, x0 + 4 + i * 104, cy, 100, 38, 0x0f1226);
-        addText(this, L, x0 + 54 + i * 104, cy + 10, 'empty', { size: 12, color: '#555a80', align: 'center' });
+        addPanel(this, L, x0 + 4 + i * 104, cy, 100, 34, 0x0f1226);
+        addText(this, L, x0 + 54 + i * 104, cy + 9, 'empty', { size: 12, color: '#8a86a0', align: 'center' });
       }
     }
-    if (k.consumables.length && !canUse) addText(this, L, x0 + 4, cy + 40, 'Items: use before rolling, or in a fight.', { size: 11, color: COL.dim });
-    else if (k.consumables.length) addText(this, L, x0 + 4, cy + 40, 'Tap an item to use it.', { size: 11, color: COL.dim });
 
     // seals
-    const sy = cy + 58;
-    addText(this, L, x0 + 4, sy, 'Seals:', { size: 14, bold: true });
+    const sy = cy + 44;
+    addText(this, L, x0 + 4, sy + 2, `Seals (need ${CONFIG.sealsToEnter}):`, { size: 13, bold: true });
     for (let i = 0; i < 4; i++) {
       const held = k.seals.includes(i);
-      const d = this.add.polygon(x0 + 86 + i * 44, sy + 10, [0, -12, 11, 0, 0, 12, -11, 0], held ? SEAL_COLORS[i] : 0x0b0d17).setStrokeStyle(2, SEAL_COLORS[i]);
+      const d = this.add.polygon(x0 + 150 + i * 40, sy + 10, [0, -11, 10, 0, 0, 11, -10, 0], held ? SEAL_COLORS[i] : 0x0b0d17).setStrokeStyle(2, SEAL_COLORS[i]);
       this.uiLayer.add(d);
     }
-    addText(this, L, x0 + 4, sy + 24, `Need ${CONFIG.sealsToEnter}+ to face the Warden`, { size: 11, color: COL.dim });
 
     // scars
-    const scy = sy + 42;
-    addText(this, L, x0 + 4, scy, 'Scars:', { size: 14, bold: true });
-    if (k.scars.length === 0) addText(this, L, x0 + 64, scy + 1, 'none', { size: 13, color: COL.dim });
+    const scy = sy + 28;
+    addText(this, L, x0 + 4, scy, k.scars.length ? 'Scars:' : 'Scars: none', { size: 13, bold: true, color: k.scars.length ? COL.text : COL.dim });
     k.scars.slice(0, 3).forEach((id, i) => {
       const sc = getScar(id);
-      addText(this, L, x0 + 4, scy + 18 + i * 16, `${sc.name}: ${sc.desc}`, { size: 12, color: COL.bad });
+      addText(this, L, x0 + 4, scy + 17 + i * 15, `${sc.name}: ${sc.desc}`, { size: 12, color: COL.bad });
     });
-    if (k.scars.length > 3) addText(this, L, x0 + 4, scy + 18 + 48, `+${k.scars.length - 3} more`, { size: 12, color: COL.bad });
+    if (k.scars.length > 3) addText(this, L, x0 + 210, scy, `(+${k.scars.length - 3} more)`, { size: 12, color: COL.bad });
     // renown and boons
-    const by = scy + 88;
+    const by = scy + 17 + Math.min(3, k.scars.length) * 15 + 4;
     const nextAt = LEVEL_THRESHOLDS[k.boons.length + k.pendingBoons];
-    addText(this, L, x0 + 4, by, `Renown ${k.renown}${nextAt ? ` (level-up at ${nextAt})` : ''}`, { size: 13, bold: true, color: '#ffd36a' });
-    if (k.boons.length) addText(this, L, x0 + 4, by + 18, k.boons.map((id) => getBoon(id).name).join(', '), { size: 12, color: '#e8d6a8', wrap: 306 });
+    addText(this, L, x0 + 4, by, `Renown ${k.renown}${nextAt ? ` (level-up at ${nextAt})` : ''}${k.boons.length ? ': ' + k.boons.map((id) => getBoon(id).name).join(', ') : ''}`, { size: 12, bold: true, color: '#ffd36a', wrap: 306 });
 
     // all knights
     const ky = H - 4 - 8 - s.players.length * 20 - 20;
@@ -585,7 +591,7 @@ export class GameScene extends Phaser.Scene {
     switch (s.stage) {
       case 'roll':
         addText(this, L, bx, 442, `${k.name}'s move`, { size: 17, bold: true, color: hex(k.color) });
-        addButton(this, L, bx, 470, bw, 90, 'ROLL THE DIE', () => this.dispatch({ type: 'roll' }), { size: 26, fill: COL.primary });
+        addButton(this, L, bx, 470, bw, 90, 'ROLL THE DIE', () => this.dispatch({ type: 'roll' }), { size: 26, fill: COL.primary, sub: 'Space / Enter' });
         break;
       case 'move': {
         const rolled = addText(this, L, 600, 438, `Rolled ${s.moveRoll}`, { size: 34, bold: true, align: 'center', color: COL.gold });
@@ -624,7 +630,7 @@ export class GameScene extends Phaser.Scene {
         const lastOfDay = next === null;
         addText(this, L, 561, 446, 'Turn complete.', { size: 16, align: 'center', color: COL.dim });
         addButton(this, L, bx, 472, bw, 80, 'END TURN', () => this.dispatch({ type: 'endTurn' }), {
-          size: 24, fill: 0x2f7a4a, sub: lastOfDay ? 'Next: a new day dawns' : `Pass to ${next!.name}`,
+          size: 24, fill: 0x2f7a4a, sub: lastOfDay ? 'A new day dawns (Space)' : `Pass to ${next!.name} (Space)`,
         });
         break;
       }

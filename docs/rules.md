@@ -11,10 +11,10 @@
 
 ## Time and the moon
 
-- A knight's turn is one move. One full round of all knights is **1 day**. The knight who opens the day rotates every day, so nobody always moves first.
+- A knight's turn is one move. One full round of all knights is **1 day**. At every dawn the turn order (**initiative**) is shuffled at random, so no seat is favoured. Today's order is shown in the side panel.
 - **4 days = 1 moon phase.** Phases cycle New (days 1-4), Waxing (5-8), **Full (9-12)**, Waning (13-16), New (17-20) ... Full again on days 25-28.
 - The current day and phase are always shown in the side panel.
-- **Moon effect on monsters** (lair monsters and the Sanctum guardian are modified when a fight starts):
+- **Moon effect on monsters** (every monster is modified when a fight starts):
 
 | Phase | Monster HP | Attack | Defense |
 | --- | --- | --- | --- |
@@ -23,8 +23,11 @@
 | Full | +30% | +2 | +1 |
 | Waning | -10% | normal | normal |
 
+**Moon affinity:** each monster also has its own strong phase (+15% HP, +1 Attack) and weak phase (-15% HP, -1 Attack), on top of the table above. The arena and the node info show it.
+
 ## Turn
 
+0. If you earned a level-up, choose your boon first (see Renown).
 1. (Optional) use a consumable.
 2. **Roll a d6.** Scar modifiers and boots may change it (minimum 1).
 3. **Move up to that many steps** along paths (you may stop earlier, or stay put). You may walk through other nodes and other knights without effect; only the node you stop on resolves.
@@ -36,11 +39,25 @@
 | Node | Effect |
 | --- | --- |
 | **Home** | Your own Home heals you fully. A rival's Home does nothing. |
-| **Road** | Nothing. |
+| **Road** | Half the time a **road event** (below); otherwise nothing. |
 | **Village** | Shop (4 villages, each sells 2 weapons, 2 armors, 2 consumables) and a healer (1.5 gold per HP). Buying a weapon or armor replaces yours (the old one is sold back for half its value). Equipment is bought only if it is an upgrade. |
 | **Lair** | A monster guards the lair's Seal. If you do not hold that Seal yet, you must fight (or flee). Winning gives the Seal, gold and a loot item. |
 | **Ruins** | Random: gold (30%), loot (35%, better tiers later in the game), a trap that deals 4-10 damage but never kills (25%), or nothing (10%). After exploring, a ruin is picked clean for 3 days. |
 | **Sanctum** | See below. |
+
+### Road events
+
+When a road event happens you choose what to do:
+
+| Event | Choices |
+| --- | --- |
+| Wandering Merchant | Buy a random item at 70% of its price, or move on. |
+| Ambush! | Fight a wandering monster (gold, maybe loot, renown - no Seal), or run and drop the flee cost. |
+| Roadside Shrine | Pray: heal 10 and +2 Attack or Defense for your next fight. Plunder: +25 gold, 40% chance of a 6-damage curse (never lethal). |
+| Bone Dice | Bet 10 or 30 gold: you and the drovers each roll a d6; higher wins the bet, a tie is a push. Or walk away. |
+| Wounded Traveler | Pay 10 gold for a random potion or charm, or ride past. |
+| Will-o'-the-Wisp | Follow: 50% teleport to a random village, ruins or lair; 50% lose 6 HP (never lethal). Or stay. |
+| Old Sword-Hermit | Pay 40 gold for +1 renown, or decline. |
 
 ### Seals
 
@@ -49,7 +66,7 @@ There are **4 Seals**, one per Lair. Seals are held per knight: every knight can
 ## The Sanctum and winning
 
 - The Sanctum is **open only during the Full moon**.
-- A knight stopping on the Sanctum while it is open **and** holding **3 or more Seals** must fight the **Hollow Warden** (HP 62, Attack 9, Defense 5 before moon effects; adaptive moves). Winning the fight **wins the game**.
+- A knight stopping on the Sanctum while it is open **and** holding **3 or more Seals** must fight the **Hollow Warden** (HP 66, Attack 10, Defense 5 before moon effects; adaptive moves). Winning the fight **wins the game**.
 - Losing counts as a death. The game goes on. Fleeing before round 1 is allowed (costs gold).
 - If the Sanctum is closed or the knight has fewer than 3 Seals, nothing happens (the knight may wait there and enter when it opens by holding position on a later turn).
 - **Day cap:** if day 40 ends without a winner, the knight with the most Seals wins; ties are broken by gold, then by seat order.
@@ -66,17 +83,30 @@ Fights are played in rounds. Both sides choose in secret:
 - A fight ends when one side reaches 0 HP. If both reach 0 in the same round, the side with more HP going into that round survives with 1 HP (a tie favours the defender / monster).
 - Consumables can be used before choosing a move in a round.
 
+### Arena mode (default) and Classic mode
+
+- **Arena:** a side-view duel. A monster winds up the move the rules engine will really play. A **blue ward** means Guard. A raised weapon glowing **red** means Strike. A weapon that **flickers gold** means Feint. Strike and Feint look the same for the first half of the wind-up. Answer before the impact with J/K/L (also A/S/D, 1/2/3, arrow keys) or the big buttons. No answer counts as Guard ("hesitated"). How long the wind-up lasts depends on the monster (0.8-1.3 s, slower with the Slow animation setting).
+- **Duels in the arena:** both knights press at the same time on one device. The left player uses A/S/D or the left buttons, the right player J/K/L or the right buttons. A press only shows "READY"; both moves are revealed at the clash.
+- **Classic:** choose from buttons. Duels between two humans use pass-the-device screens and a tap-to-reveal.
+- The rules, damage and odds are identical in both modes.
+
 ### Monsters
 
-Monsters choose moves from **weighted patterns**, with a signature opener and sometimes a habit, so players can learn them. The monster's hint is shown during the fight.
+Monsters choose moves from **weighted patterns**, with a signature opener and sometimes a habit, so players can learn them.
 
-| Monster (lair) | HP | ATK | DEF | Pattern |
-| --- | --- | --- | --- | --- |
-| Dire Wolf (Wolf Den, N) | 34 | 5 | 2 | Strike 44 / Guard 20 / Feint 36, opens Strike |
-| Bog Troll (Troll Bog, E) | 46 | 6 | 3 | Strike 30 / Guard 40 / Feint 30, opens Guard |
-| Rust Knight (Rust Keep, S) | 38 | 6 | 3 | Even, opens Feint, **adaptive**: often counters your last move |
-| Cave Drake (Drake Cave, W) | 48 | 7 | 3 | Strike 44 / Guard 26 / Feint 30, opens Strike, **stubborn**: repeats a move that did not lose |
-| Hollow Warden (Sanctum) | 62 | 9 | 5 | Strike 36 / Guard 28 / Feint 36, opens Guard, adaptive |
+| Monster | Where | HP | ATK | DEF | Pattern | Strong / weak moon |
+| --- | --- | --- | --- | --- | --- | --- |
+| Dire Wolf | Wolf Den (N) | 34 | 5 | 2 | Strike 44 / Guard 20 / Feint 36, opens Strike | Full / New |
+| Bog Troll | Troll Bog (E) | 46 | 6 | 3 | Strike 30 / Guard 40 / Feint 30, opens Guard | Waxing / Waning |
+| Rust Knight | Rust Keep (S) | 38 | 6 | 3 | Even, opens Feint, **adaptive** (often counters your last move) | Waning / Waxing |
+| Cave Drake | Drake Cave (W) | 48 | 7 | 3 | Strike 44 / Guard 26 / Feint 30, opens Strike, **stubborn** (repeats a move that did not lose) | New / Full |
+| Road Bandit | ambush | 26 | 4 | 2 | Strike 40 / Guard 30 / Feint 30, opens Feint | Waning / Full |
+| Giant Spider | ambush | 22 | 5 | 1 | Feint 60 / Strike 25 / Guard 15, stubborn | New / Full |
+| Marsh Serpent | ambush | 30 | 4 | 2 | Strike 50 / Guard 25 / Feint 25, adaptive | Waxing / Waning |
+| Bone Golem | ambush | 40 | 5 | 4 | Guard 50 / Strike 30 / Feint 20, opens Guard | Full / New |
+| Hollow Warden | Sanctum | 66 | 10 | 5 | Strike 36 / Guard 28 / Feint 36, opens Guard, adaptive | - |
+
+Monsters have 14 Stamina and follow the same Stamina rules.
 
 ### Fleeing
 
@@ -91,7 +121,7 @@ A knight who drops to 0 HP **stays in the game**:
 - gains one **permanent Scar** (not a duplicate while unseen ones remain),
 - is placed on their Home node and **respawns at full HP at the start of their next turn**. While fallen they cannot be challenged.
 
-Scars (11 types, always visible on the knight):
+Scars (15 types, listed in the panel and drawn on the knight in the arena):
 
 | Scar | Effect |
 | --- | --- |
@@ -106,6 +136,25 @@ Scars (11 types, always visible on the knight):
 | Cold Resolve | +2 max Stamina, -1 Attack |
 | Debt-Marked | Shop prices +25% |
 | Tenacious | +3 max HP, -1 to movement rolls |
+| Burned Hands | Strike costs +1 Stamina |
+| Frostbitten | -1 Defense |
+| Grim Veteran | +1 Attack, -3 max HP |
+| Haunted | Monsters you fight get +1 Attack |
+
+## Renown and level-ups
+
+Every victory earns 1 renown: lair monsters, ambushes and duels all count, and so does training with the Sword-Hermit. At **2, 4, 7, 11 and 16** renown you level up. At the start of your next turn you choose **1 of 3 random boons**, which last the whole game:
+
+| Boon | Effect |
+| --- | --- |
+| Vigor | +5 max HP |
+| Might | +1 Attack |
+| Bulwark | +1 Defense |
+| Endurance | +2 max Stamina |
+| Second Wind | Guard restores +1 Stamina |
+| Fleet-foot | +1 to movement rolls |
+| Haggler | Shop prices -20% |
+| Trickster | Feint costs 1 less Stamina |
 
 ## Duels (PvP)
 
@@ -127,6 +176,14 @@ Equipment: **one weapon** (adds Attack) and **one armor** (adds Defense). Pack: 
 **Consumables (7):** Healing Draught (heal 12), Greater Draught (heal 28), Whetstone (+3 Attack until your next fight ends), Iron Tonic (+3 Defense until next fight ends), Vigor Brew (+4 max Stamina until next fight ends), Swift Boots Charm (+3 to your next roll), Smoke Bomb (next flee is free). Buffs apply to the next fight and wear off when it ends.
 
 Exact prices and stock are in `src/data/items.ts` and `src/data/board.ts`.
+
+## End of the game
+
+The summary screen shows each knight's Seals, gold, fights won, duels won, deaths, level-ups, boons and scars. It also gives awards: Most Feared, Most Scarred and Deepest Purse.
+
+## Saving
+
+The game is saved in the browser after every action. **Resume** on the title screen continues it. The in-game Menu has "Save and quit to title".
 
 ## Map
 

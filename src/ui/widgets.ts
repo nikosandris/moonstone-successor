@@ -21,7 +21,8 @@ export function addText(
 ): Phaser.GameObjects.Text {
   const t = scene.add.text(x, y, str, {
     fontFamily: o.serif ? SERIF : FONT,
-    fontSize: `${o.size ?? 16}px`,
+    // never below 12 logical px: at 800x360 the canvas is scaled to ~62%
+    fontSize: `${Math.max(12, o.size ?? 16)}px`,
     fontStyle: o.bold ? 'bold' : 'normal',
     color: o.color ?? COL.text,
     align: o.align ?? 'left',

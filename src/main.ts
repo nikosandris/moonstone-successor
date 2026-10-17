@@ -20,7 +20,7 @@ function start(players: PlayerSetup[], seed: number, resume?: GameState): void {
     backgroundColor: '#0b0d17',
     scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
     scene: [],
-    render: { antialias: true },
+    render: { antialias: true, maxLights: 16 },
   });
   game.scene.add('Arena', ArenaScene, false);
   game.scene.add('Game', GameScene, true, {

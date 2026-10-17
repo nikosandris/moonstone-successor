@@ -33,3 +33,7 @@ One line each: decision - reasoning.
 - M6: Rules and Settings are DOM overlays (scrollable, real form controls, readable on phones) instead of Phaser modals; the in-game Menu adds Resume and "Save and quit to title".
 - M6: Tutorial = 6 coach marks on the first human turn; two steps wait for the real action (roll, move) instead of a Next button. Shown once, re-enable in Settings.
 - M6: Volume moved off the setup screen into Settings to keep setup usable at 800x360.
+- M7: Text never renders below 12 logical px (about 7.5 CSS px at 800x360); the panel was reflowed and items got short labels to fit. Low-contrast "empty" text was brightened.
+- M7: Space/Enter roll the die and end the turn (plus the arena keys) so a keyboard-only player never needs the mouse on desktop.
+- M7: Leather Jerkin raised to +2 Defense - at +1 it was never an upgrade over the starting coat (0 uses in the sim).
+- M7: Light2D `maxLights` raised to 16 so all 13 map lights render.
