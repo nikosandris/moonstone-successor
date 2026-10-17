@@ -1,0 +1,11 @@
+[
+  { "role": "knight", "queries": ["knight animated", "medieval knight rigged", "armored warrior animated"], "maxFaces": 60000 },
+  { "role": "wolf", "queries": ["werewolf animated", "wolf animated", "dire wolf"], "maxFaces": 60000 },
+  { "role": "troll", "queries": ["troll animated", "ogre animated", "orc brute animated"], "maxFaces": 60000 },
+  { "role": "undead", "queries": ["skeleton knight animated", "undead warrior animated", "zombie knight"], "maxFaces": 60000 },
+  { "role": "dragon", "queries": ["dragon animated", "wyvern animated"], "maxFaces": 90000 },
+  { "role": "spider", "queries": ["giant spider animated", "spider monster animated"], "maxFaces": 50000 },
+  { "role": "serpent", "queries": ["naga animated", "giant snake animated", "serpent monster"], "maxFaces": 60000 },
+  { "role": "golem", "queries": ["golem animated", "stone golem rigged"], "maxFaces": 60000 },
+  { "role": "wraith", "queries": ["wraith animated", "lich animated", "grim reaper animated"], "maxFaces": 60000 }
+]
