@@ -1,0 +1,20 @@
+{
+  "uid": "a29e4ca5bca3481ca19b8480b75a2a96",
+  "name": "Anacondas: 3D Adventure Game - Giant Anaconda",
+  "author": "Ziggertron",
+  "license": "CC Attribution",
+  "url": "https://sketchfab.com/3d-models/anacondas-3d-adventure-game-giant-anaconda-a29e4ca5bca3481ca19b8480b75a2a96",
+  "clips": [
+    "Neutral_Rest",
+    "f_attack",
+    "f_idle",
+    "f_walk",
+    "f_run",
+    "f_knock",
+    "f_hit",
+    "Full_Source_Timeline__Main",
+    "Death__f_knock",
+    "Alternate_s__undefine_action",
+    "Full_Source_Timeline__Alternate_s"
+  ]
+}

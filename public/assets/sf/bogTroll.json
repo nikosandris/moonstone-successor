@@ -1,0 +1,17 @@
+{
+  "uid": "bceb1cb47186457c8571a23e6aff1b8e",
+  "name": "Troll",
+  "author": "SJunior3d",
+  "license": "CC Attribution",
+  "url": "https://sketchfab.com/3d-models/troll-bceb1cb47186457c8571a23e6aff1b8e",
+  "clips": [
+    "idle",
+    "idle_break",
+    "walk",
+    "run",
+    "attack1",
+    "attack2",
+    "take_damage",
+    "death"
+  ]
+}

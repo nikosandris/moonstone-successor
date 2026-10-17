@@ -1,0 +1,18 @@
+{
+  "uid": "19c1855bdb2c4cdc89da2cfb64da48cf",
+  "name": "Drugdör The Golem Animated",
+  "author": "Phons",
+  "license": "CC Attribution",
+  "url": "https://sketchfab.com/3d-models/drugdor-the-golem-animated-19c1855bdb2c4cdc89da2cfb64da48cf",
+  "clips": [
+    "Attack1",
+    "Attack3",
+    "Defence2",
+    "Idle",
+    "Walk",
+    "Defence1",
+    "Attack2",
+    "Defence3",
+    "IdlePieces"
+  ]
+}

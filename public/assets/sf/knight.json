@@ -1,0 +1,13 @@
+{
+  "uid": "e3978fb660cf47278485d44eeba488ef",
+  "name": "Armored King",
+  "author": "Calviking073",
+  "license": "CC Attribution",
+  "url": "https://sketchfab.com/3d-models/armored-king-e3978fb660cf47278485d44eeba488ef",
+  "clips": [
+    "FIGHTIDLE_Root",
+    "Player_Sneak_Root",
+    "run_player_Root",
+    "WALK_player_Root"
+  ]
+}

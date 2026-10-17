@@ -1,0 +1,17 @@
+{
+  "uid": "af87017501fc44e39a33c220f2435100",
+  "name": "Animated Spider",
+  "author": "Shadocks",
+  "license": "CC Attribution",
+  "url": "https://sketchfab.com/3d-models/animated-spider-af87017501fc44e39a33c220f2435100",
+  "clips": [
+    "Armature|walk",
+    "Armature|walk back",
+    "Armature|large walk",
+    "Armature|walk tight",
+    "Armature|run",
+    "Armature|attack",
+    "Armature|die",
+    "Armature|idle"
+  ]
+}
