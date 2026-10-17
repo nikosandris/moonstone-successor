@@ -91,26 +91,32 @@ function findFile(dir: string, pred: (f: string) => boolean): string | null {
 async function fetchPicks(): Promise<void> {
   const token = process.env.SKETCHFAB_TOKEN;
   if (!token) throw new Error('SKETCHFAB_TOKEN secret is missing');
+  const only = process.argv[3]?.split(',');
   const picks = JSON.parse(readFileSync(join(DIR, 'picks.json'), 'utf8')) as Record<string, string>;
-  const credits: string[] = [];
   mkdirSync(OUT, { recursive: true });
   await MeshoptEncoder.ready;
   const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({ 'meshopt.encoder': MeshoptEncoder });
   const sharp = (await import('sharp')).default;
   const failed: string[] = [];
   for (const [role, uid] of Object.entries(picks)) {
+    if (only && !only.includes(role)) continue;
     try {
-      credits.push(await fetchOne(role, uid, token, io, sharp));
+      await fetchOne(role, uid, token, io, sharp);
     } catch (e) {
       console.error(`${role} (${uid}) failed: ${String(e)}`);
       failed.push(role);
     }
   }
+  // credits for every model present, including ones fetched by earlier runs
+  const credits = readdirSync(OUT).filter((f) => f.endsWith('.json')).sort().map((f) => {
+    const m = JSON.parse(readFileSync(join(OUT, f), 'utf8'));
+    return `- **${f.replace('.json', '')}**: "${m.name}" by ${m.author} (${m.license}) - ${m.url}`;
+  });
   writeFileSync(join(OUT, 'CREDITS.md'), `# Sketchfab models\n\n${credits.join('\n')}\n`);
   if (failed.length) console.log(`failed: ${failed.join(', ')}`);
 }
 
-async function fetchOne(role: string, uid: string, token: string, io: NodeIO, sharp: any): Promise<string> {
+async function fetchOne(role: string, uid: string, token: string, io: NodeIO, sharp: any): Promise<void> {
   const info = await getJson(`${API}/models/${uid}`);
   const dl = await getJson(`${API}/models/${uid}/download`, token);
   const tmp = join('/tmp', `sf_${uid}`);
@@ -137,7 +143,6 @@ async function fetchOne(role: string, uid: string, token: string, io: NodeIO, sh
   const clips = doc.getRoot().listAnimations().map((a) => a.getName());
   writeFileSync(join(OUT, `${role}.json`), JSON.stringify({ uid, name: info.name, author: info.user?.displayName, license: info.license?.label, url: info.viewerUrl, clips }, null, 2));
   console.log(`${role}: ${(bytes.length / 1024).toFixed(0)} KB, clips: ${clips.join(', ')}`);
-  return `- **${role}**: "${info.name}" by ${info.user?.displayName} (${info.license?.label}) - ${info.viewerUrl}`;
 }
 
 const mode = process.argv[2];

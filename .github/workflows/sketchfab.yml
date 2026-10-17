@@ -10,7 +10,7 @@ on:
         type: choice
         options: [scout, fetch]
       roles:
-        description: optional comma-separated roles (scout only these, keep the rest)
+        description: optional comma-separated roles (only these; others are kept)
         required: false
         default: ''
 
