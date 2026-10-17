@@ -130,4 +130,4 @@ Exact prices and stock are in `src/data/items.ts` and `src/data/board.ts`.
 
 ## Map
 
-31 nodes: 4 Homes (corners), 4 Villages (next to the Homes), 4 Lairs (N, E, S, W), 8 Ruins, 10 Roads... and the Sanctum in the centre, reached by four spokes from the lairs plus inner diagonals. The Sanctum is about 4 steps from every Home, but you need Seals first and the Full moon.
+31 nodes: 4 Homes (corners), 4 Villages (next to the Homes), 4 Lairs (N, E, S, W), 6 Ruins, 12 Roads, and the Sanctum in the centre, reached by four spokes from the lairs plus inner diagonals. The Sanctum is about 4 steps from every Home, but you need Seals first and the Full moon.
