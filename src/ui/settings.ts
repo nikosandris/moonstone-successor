@@ -8,10 +8,12 @@ export interface Settings {
   animSpeed: number; // 0.5 slow .. 2 fast
   blood: boolean;
   tutorial: boolean;
+  /** how long the reaction window lasts in real-time duels */
+  reaction: 'relaxed' | 'normal' | 'expert';
 }
 
 const KEY = 'moonblood.settings';
-const DEFAULTS: Settings = { v: 2, duelMode: 'arena3d', volume: 0.7, muted: false, animSpeed: 1, blood: true, tutorial: true };
+const DEFAULTS: Settings = { v: 2, duelMode: 'arena3d', volume: 0.7, muted: false, animSpeed: 1, blood: true, tutorial: true, reaction: 'normal' };
 
 let current: Settings = load();
 
@@ -28,6 +30,11 @@ function load(): Settings {
     // storage blocked: fall back to defaults
   }
   return { ...DEFAULTS };
+}
+
+/** Multiplier on every monster's telegraph time (and the duel window). */
+export function reactionScale(): number {
+  return { relaxed: 2.4, normal: 1.8, expert: 1.15 }[current.reaction] ?? 1.8;
 }
 
 export function getSettings(): Settings {

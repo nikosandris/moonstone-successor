@@ -10,7 +10,7 @@ import { CONFIG } from '../../data/balance';
 import { getItem } from '../../data/items';
 import { getMonster } from '../../data/monsters';
 import { audio } from '../audio';
-import { getSettings } from '../settings';
+import { getSettings, reactionScale } from '../settings';
 import { hex } from '../theme';
 import { icon } from '../hud/icons';
 import { Actor3D, type ActorLook } from './Actor3D';
@@ -26,7 +26,7 @@ export interface Arena3DHost {
 type Side = 'a' | 'b';
 type Phase = 'prep' | 'window' | 'impact' | 'over' | 'closed';
 
-const PVP_WINDOW = 1800;
+const PVP_WINDOW = 1500;
 /** pressing in the last part of the reaction window counts as a perfect read */
 export const PERFECT_FROM = 0.7;
 const KEYS: Record<string, Choice> = { j: 'strike', k: 'guard', l: 'feint', a: 'strike', s: 'guard', d: 'feint', '1': 'strike', '2': 'guard', '3': 'feint', arrowright: 'strike', arrowup: 'guard', arrowdown: 'feint' };
@@ -476,7 +476,8 @@ export class Arena3D {
     this.drawControls();
     const anyHuman = this.human('a') || this.human('b');
     if (c.round === 0 && anyHuman) return;
-    this.after(c.round === 0 ? 900 : 1000, () => this.startWindow());
+    if (c.round > 0) this.after(350, () => { if (this.phase === 'prep') this.banner(`Round ${c.round + 1}`, false, 900); });
+    this.after(c.round === 0 ? 1100 : 1900, () => this.startWindow());
   }
 
   private startWindow(): void {
@@ -487,8 +488,8 @@ export class Arena3D {
     this.windowT = 0;
     if (c.kind !== 'pvp') {
       this.intent.b = previewMonsterChoice(this.s) ?? 'guard';
-      this.windowMs = getMonster(c.monsterId!).tellMs;
-    } else this.windowMs = PVP_WINDOW;
+      this.windowMs = getMonster(c.monsterId!).tellMs * reactionScale();
+    } else this.windowMs = PVP_WINDOW * reactionScale();
     this.els.timing.classList.add('on');
     this.setArc(0);
     this.markArc(null);
@@ -671,7 +672,7 @@ export class Arena3D {
       } else if (winner === 'tie') this.banner('Clash');
     });
     for (const side of hesitated) this.pop(side, 'Hesitated - Guard', 'info');
-    this.after(1500, () => {
+    this.after(1900, () => {
       this.refreshHud();
       if (this.s.combat?.over) this.over();
       else {

@@ -7,7 +7,7 @@ import type { Action, Choice, GameState, Knight } from '../../core/types';
 import { getItem } from '../../data/items';
 import { getMonster } from '../../data/monsters';
 import { audio } from '../audio';
-import { getSettings } from '../settings';
+import { getSettings, reactionScale } from '../settings';
 import { COL, H, W, hex } from '../theme';
 import { addBar, addButton, addText } from '../widgets';
 import { Fighter } from './Fighter';
@@ -21,7 +21,7 @@ type Side = 'a' | 'b';
 type Phase = 'prep' | 'window' | 'impact' | 'over';
 
 const GROUND = 420;
-const PVP_WINDOW = 1800;
+const PVP_WINDOW = 1500;
 const IMPACT_MS = 700;
 
 const KEYS: Record<string, Choice> = { J: 'strike', K: 'guard', L: 'feint', A: 'strike', S: 'guard', D: 'feint', ONE: 'strike', TWO: 'guard', THREE: 'feint', RIGHT: 'strike', UP: 'guard', DOWN: 'feint' };
@@ -321,7 +321,7 @@ export class ArenaScene extends Phaser.Scene {
     this.prepControls();
     const anyHuman = this.human('a') || this.human('b');
     if (c.round === 0 && anyHuman) return; // wait for FIGHT (lets the player use items or flee)
-    this.timer = this.time.delayedCall(c.round === 0 ? 700 : 1100, () => this.startWindow());
+    this.timer = this.time.delayedCall(c.round === 0 ? 900 : 1700, () => this.startWindow());
   }
 
   private prepControls(): void {
@@ -353,8 +353,8 @@ export class ArenaScene extends Phaser.Scene {
     this.phase = 'window';
     if (c.kind !== 'pvp') {
       this.intent.b = previewMonsterChoice(this.s) ?? 'guard';
-      this.windowMs = getMonster(c.monsterId!).tellMs;
-    } else this.windowMs = PVP_WINDOW;
+      this.windowMs = getMonster(c.monsterId!).tellMs * reactionScale();
+    } else this.windowMs = PVP_WINDOW * reactionScale();
     this.clearControls();
     if (c.kind === 'pvp') {
       if (this.human('a')) this.drawMoveButtons('a', 20, 470, 'ASD');

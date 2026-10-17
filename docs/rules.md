@@ -85,7 +85,7 @@ Fights are played in rounds. Both sides choose in secret:
 
 ### Arena mode (default) and Classic mode
 
-- **Arena:** a side-view duel. A monster winds up the move the rules engine will really play. A **blue ward** means Guard. A raised weapon glowing **red** means Strike. A weapon that **flickers gold** means Feint. Strike and Feint look the same for the first half of the wind-up. Answer before the impact with J/K/L (also A/S/D, 1/2/3, arrow keys) or the big buttons. No answer counts as Guard ("hesitated"). How long the wind-up lasts depends on the monster (0.8-1.3 s, slower with the Slow animation setting).
+- **Arena:** a side-view duel. A monster winds up the move the rules engine will really play. A **blue ward** means Guard. A raised weapon glowing **red** means Strike. A weapon that **flickers gold** means Feint. Strike and Feint look the same for the first half of the wind-up. Answer before the impact with J/K/L (also A/S/D, 1/2/3, arrow keys) or the big buttons. No answer counts as Guard ("hesitated"). How long the wind-up lasts depends on the monster: 1.4-2.3 s on the default Normal reaction setting. Relaxed (x1.33) and Expert (x0.64) are in Settings, and the Slow animation setting stretches it further. Pressing in the last 30% (the gold end of the timing arc) is a perfect read: a won exchange deals x1.5 damage.
 - **Duels in the arena:** both knights press at the same time on one device. The left player uses A/S/D or the left buttons, the right player J/K/L or the right buttons. A press only shows "READY"; both moves are revealed at the clash.
 - **Classic:** choose from buttons. Duels between two humans use pass-the-device screens and a tap-to-reveal.
 - The rules, damage and odds are identical in both modes.

@@ -46,3 +46,4 @@ One line each: decision - reasoning.
 - N1: Monsters reuse recoloured/re-armed KayKit characters until bespoke monster models (N2).
 - N1: The whole map interface moved from Phaser-drawn boxes to an HTML/CSS design system (Cinzel/Spectral, gilded frames, medallions, crest-shaped action sigils, game-icons.net glyphs) - CSS/SVG gives far richer, crisper UI than canvas primitives. Classic-duel mode screens stay in Phaser.
 - N1: 3D Arena is the default duel mode; 2D Arena and Classic remain in Settings; the 3D arena falls back to 2D until models load or if WebGL2 is missing.
+- N1 feedback: reaction windows were too short (0.8-1.3 s). Now monster telegraph time x1.8 on Normal (1.4-2.3 s, perfect zone 0.4-0.7 s), x2.4 Relaxed, x1.15 Expert (new Reaction time setting); 1.9 s pause with a round banner between exchanges. Duel window 2.7 s on Normal.
