@@ -6,8 +6,8 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { NodeIO } from '@gltf-transform/core';
 import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
-import { dedup, meshopt, prune, textureCompress, weld } from '@gltf-transform/functions';
-import { MeshoptEncoder } from 'meshoptimizer';
+import { dedup, meshopt, prune, simplify, textureCompress, weld } from '@gltf-transform/functions';
+import { MeshoptEncoder, MeshoptSimplifier } from 'meshoptimizer';
 
 const API = 'https://api.polyhaven.com';
 const DIR = 'tools/polyhaven';
@@ -67,7 +67,7 @@ async function scout(): Promise<void> {
   writeFileSync(join(DIR, 'candidates.json'), JSON.stringify(out, null, 2));
 }
 
-interface Picks { textures?: Record<string, string>; hdri?: Record<string, string>; models?: Record<string, string> }
+interface Picks { textures?: Record<string, string>; hdri?: Record<string, string>; models?: Record<string, string | { id: string; tris?: number }> }
 
 async function fetchPicks(): Promise<void> {
   const picks = JSON.parse(readFileSync(join(DIR, 'picks.json'), 'utf8')) as Picks;
@@ -96,14 +96,24 @@ async function fetchPicks(): Promise<void> {
   }
   await MeshoptEncoder.ready;
   const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({ 'meshopt.encoder': MeshoptEncoder });
-  for (const [name, id] of Object.entries(picks.models ?? {})) {
+  await MeshoptSimplifier.ready;
+  for (const [name, pick] of Object.entries(picks.models ?? {})) {
+    const id = typeof pick === 'string' ? pick : pick.id;
+    const target = typeof pick === 'string' ? 12000 : pick.tris ?? 12000;
     const files = await getJson(`${API}/files/${id}`);
     const g = files.gltf['1k'].gltf;
     const json = JSON.parse(new TextDecoder().decode(await getBytes(g.url)));
     const resources: Record<string, Uint8Array<ArrayBuffer>> = {};
     for (const [path, inc] of Object.entries(g.include ?? {})) resources[path] = await getBytes((inc as { url: string }).url);
     const doc = await io.readJSON({ json, resources });
-    await doc.transform(dedup(), weld(), prune(), textureCompress({ encoder: sharp, targetFormat: 'webp', resize: [512, 512] }), meshopt({ encoder: MeshoptEncoder, level: 'medium' }));
+    // scanned models are dense: simplify toward a triangle budget so dozens can be instanced
+    let tris = 0;
+    for (const m of doc.getRoot().listMeshes()) for (const p of m.listPrimitives()) tris += (p.getIndices()?.getCount() ?? p.getAttribute('POSITION')!.getCount()) / 3;
+    const ratio = Math.min(1, target / Math.max(1, tris));
+    await doc.transform(dedup(), weld());
+    if (ratio < 0.95) await doc.transform(simplify({ simplifier: MeshoptSimplifier, ratio, error: 0.01 }));
+    console.log(`  ${id}: ${Math.round(tris)} tris -> ratio ${ratio.toFixed(3)}`);
+    await doc.transform(prune(), textureCompress({ encoder: sharp, targetFormat: 'webp', resize: [512, 512] }), meshopt({ encoder: MeshoptEncoder, level: 'medium' }));
     const bytes = await io.writeBinary(doc);
     writeFileSync(join(OUT, `${name}.glb`), bytes);
     credits.push(`- model **${name}**: Poly Haven "${id}" (CC0) - https://polyhaven.com/a/${id}`);
