@@ -18,8 +18,12 @@
   "mill": "080f516a0b6b402092c1314913341db8",
   "ruin_arch": "711292d5a5c343ceb675782b24f213ee",
   "ruin_wall": "6c55700635b4472f822b3772fa5e9c24",
-  "ruin_columns": "962ed874cf9a4db5bc5405584c29b664",
   "stonehenge": "37cfc2bb99944703b5d57ea281030ca6",
   "altar": "3d4f2edb18e4424cabb41b60aa160cb5",
-  "lairgate": "ea4a511423bd4a1dab2fe32665edd67e"
+  "lairgate": "ea4a511423bd4a1dab2fe32665edd67e",
+  "pine": "dc3fbd9205cf4027a4455d1f415e0478",
+  "spruce": "43b4157fe30245a88e07141ad39bec27",
+  "deadpine": "84b73e8b6efb4ca7b47409c89689927a",
+  "bush": "a83fd7049a784ca6bc0095e7323451d0",
+  "ferns": "45669699e1454dc0ae3d0eb40da0800f"
 }
