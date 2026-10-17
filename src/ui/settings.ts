@@ -5,10 +5,11 @@ export interface Settings {
   muted: boolean;
   animSpeed: number; // 0.5 slow .. 2 fast
   blood: boolean;
+  tutorial: boolean;
 }
 
 const KEY = 'moonblood.settings';
-const DEFAULTS: Settings = { duelMode: 'arena', volume: 0.7, muted: false, animSpeed: 1, blood: true };
+const DEFAULTS: Settings = { duelMode: 'arena', volume: 0.7, muted: false, animSpeed: 1, blood: true, tutorial: true };
 
 let current: Settings = load();
 

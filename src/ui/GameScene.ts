@@ -20,12 +20,15 @@ import {
 } from './theme';
 import { generateTextures } from './art/textures';
 import { audio } from './audio';
-import { getSettings, updateSettings } from './settings';
+import { showSettings } from './overlays';
+import { saveGame } from './save';
+import { getSettings, onSettings, updateSettings } from './settings';
 import { addBar, addButton, addPanel, addText } from './widgets';
 
 interface SceneData {
   players: PlayerSetup[];
   seed: number;
+  resume?: GameState;
   onExit: () => void;
 }
 
@@ -64,6 +67,8 @@ export class GameScene extends Phaser.Scene {
   private sanctumGlow: Phaser.GameObjects.Image | null = null;
   private lastPos: number[] = [];
   private justRolled = false;
+  private tutStep = -1;
+  private tutLayer: Phaser.GameObjects.Container | null = null;
 
   // hot-seat duel flow (choices stay in memory until the reveal)
   private duelKey = '';
@@ -76,8 +81,10 @@ export class GameScene extends Phaser.Scene {
   }
 
   init(data: SceneData): void {
-    this.state = createGame(data.players, data.seed);
+    this.state = data.resume ?? createGame(data.players, data.seed);
     this.onExit = data.onExit;
+    this.tutStep = !data.resume && getSettings().tutorial && this.state.players.some((p) => !p.bot) ? 0 : -1;
+    saveGame(this.state);
     this.duelKey = '';
   }
 
@@ -97,10 +104,18 @@ export class GameScene extends Phaser.Scene {
       .setDepth(200)
       .setVisible(false);
     // ?speed=N shortens bot delays (used for automated checks)
-    const speed = Number(new URLSearchParams(window.location.search).get('speed'));
-    if (speed > 0) this.time.timeScale = speed;
+    this.applySpeed();
+    onSettings(() => this.applySpeed());
     this.lastPos = this.state.players.map((p) => p.pos);
     this.render();
+  }
+
+  /** Animation speed setting (and ?speed=N for automated checks) scales timers and tweens. */
+  private applySpeed(): void {
+    if (!this.sys || !this.sys.isActive()) return;
+    const url = Number(new URLSearchParams(window.location.search).get('speed')) || 1;
+    this.time.timeScale = getSettings().animSpeed * url;
+    this.tweens.timeScale = getSettings().animSpeed * url;
   }
 
   update(time: number, delta: number): void {
@@ -129,6 +144,7 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     this.infoNode = null;
+    saveGame(this.state);
     this.feedback(before, action);
     this.render();
   }
@@ -211,6 +227,7 @@ export class GameScene extends Phaser.Scene {
     else if (s.stage === 'event') this.drawEvent();
     else if (s.stage === 'levelUp') this.drawLevelUp();
     else if (s.stage === 'gameOver') this.drawGameOver();
+    this.drawTutorial();
     this.scheduleBot();
   }
 
@@ -462,7 +479,10 @@ export class GameScene extends Phaser.Scene {
     addText(this, L, x0 + 76, 56, open ? 'Sanctum is OPEN' : `Sanctum opens in ${daysUntilFull(s.day)} day(s)`, { size: 15, color: open ? COL.gold : COL.dim, bold: open });
     addText(this, L, x0 + 4, 82, moonEffect(s.day).text, { size: 12, color: COL.dim, wrap: 306 });
     const muted = getSettings().muted;
-    addButton(this, L, W - 62, 8, 52, 30, muted ? 'Muted' : 'Sound', () => {
+    addButton(this, L, W - 118, 4, 52, 26, 'Menu', () => {
+      showSettings({ inGame: true, onQuit: () => this.onExit(), onChange: () => this.render() });
+    }, { size: 11, fill: 0x2a2238 });
+    addButton(this, L, W - 62, 4, 52, 26, muted ? 'Muted' : 'Sound', () => {
       updateSettings({ muted: !getSettings().muted });
       this.render();
     }, { size: 11, fill: muted ? 0x3a2a2a : 0x2a3a2a });
@@ -633,6 +653,65 @@ export class GameScene extends Phaser.Scene {
       6: [[-10, -11], [10, -11], [-10, 0], [10, 0], [-10, 11], [10, 11]],
     };
     for (const [px, py] of P[Math.max(1, Math.min(6, face))] ?? []) g.fillCircle(px, py, 4.5);
+  }
+
+  // ------------------------------------------------------------ tutorial
+
+  /** First-turn coach marks. Some steps wait for the player to act (roll, move). */
+  private drawTutorial(): void {
+    this.tutLayer?.destroy();
+    this.tutLayer = null;
+    const s = this.state;
+    if (this.tutStep < 0 || s.stage === 'gameOver') return;
+    const me = s.players[s.current];
+    if (me.bot) return;
+    // steps that wait for an action advance by themselves
+    if (this.tutStep === 3 && s.stage !== 'roll') this.tutStep = 4;
+    if (this.tutStep === 4 && s.stage !== 'move' && s.stage !== 'roll') this.tutStep = 5;
+    if (s.stage === 'combat' && getSettings().duelMode === 'arena') return;
+    const home = BOARD.nodes[me.pos];
+    const steps: { rect: [number, number, number, number]; text: string; wait?: boolean }[] = [
+      { rect: [mx(home.x) - 40, my(home.y) - 60, 80, 90], text: `Welcome, ${me.name}! This is your knight, standing at your Home. Home heals you fully whenever you stop there.` },
+      { rect: [PANEL_X - 6, 4, W - PANEL_X + 2, 104], text: 'The moon rules the hunt. Monsters are weak at New moon and strong at Full moon - and the Sanctum in the centre opens ONLY under the Full moon (days 9-12 and 25-28).' },
+      { rect: [PANEL_X - 6, 108, W - PANEL_X + 2, 300], text: 'Your knight: health, Attack and Defense, gold, gear, items, the four Seals and any scars. You need 3 Seals to face the Sanctum guardian.' },
+      { rect: [432, 436, 258, 136], text: 'Roll the die to begin your move.', wait: true },
+      { rect: [4, 18, 686, 412], text: 'Glowing places are within reach. Lairs (red eyes) guard Seals, Villages sell gear and healing, Ruins hide loot or traps, Roads bring events. Tap one to move there.', wait: true },
+      { rect: [432, 436, 258, 136], text: 'Fights: watch the monster wind up - a blue ward means Guard, a red glow Strike, a flickering gold glint Feint - and answer with the move that beats it. Rules and settings are always under Menu. Good hunting!' },
+    ];
+    if (this.tutStep >= steps.length) {
+      this.tutStep = -1;
+      updateSettings({ tutorial: false });
+      return;
+    }
+    const st = steps[this.tutStep];
+    const c = this.add.container(0, 0).setDepth(140);
+    const [rx, ry, rw, rh] = st.rect;
+    const shade = 0x000000;
+    const a = 0.55;
+    c.add([
+      this.add.rectangle(0, 0, W, ry, shade, a).setOrigin(0, 0),
+      this.add.rectangle(0, ry + rh, W, H - ry - rh, shade, a).setOrigin(0, 0),
+      this.add.rectangle(0, ry, rx, rh, shade, a).setOrigin(0, 0),
+      this.add.rectangle(rx + rw, ry, W - rx - rw, rh, shade, a).setOrigin(0, 0),
+    ]);
+    const frame = this.add.rectangle(rx, ry, rw, rh).setOrigin(0, 0).setStrokeStyle(3, 0xffd36a);
+    c.add(frame);
+    this.tweens.add({ targets: frame, alpha: { from: 1, to: 0.35 }, duration: 600, yoyo: true, repeat: -1 });
+    // text box placed away from the highlight
+    const boxW = 420;
+    const boxH = 132;
+    let bx = rx + rw + 16;
+    if (bx + boxW > W - 8) bx = rx - boxW - 16;
+    if (bx < 8) bx = (W - boxW) / 2;
+    let byy = Math.min(Math.max(8, ry), H - boxH - 8);
+    if (bx === (W - boxW) / 2) byy = ry > H / 2 ? ry - boxH - 12 : Math.min(H - boxH - 8, ry + rh + 12);
+    const box = this.add.rectangle(bx, byy, boxW, boxH, 0x15121f, 0.97).setOrigin(0, 0).setStrokeStyle(2, 0xc9a96a);
+    c.add(box);
+    addText(this, c, bx + 14, byy + 10, `Tutorial ${this.tutStep + 1}/${steps.length}`, { size: 12, bold: true, color: '#ffd36a' });
+    addText(this, c, bx + 14, byy + 28, st.text, { size: 14, wrap: boxW - 28 });
+    if (!st.wait) addButton(this, c, bx + boxW - 104, byy + boxH - 40, 92, 32, this.tutStep === steps.length - 1 ? 'Done' : 'Next', () => { this.tutStep++; this.render(); }, { size: 15, fill: COL.primary });
+    addButton(this, c, bx + boxW - 196, byy + boxH - 40, 84, 32, 'Skip', () => { this.tutStep = steps.length; this.render(); }, { size: 13, fill: 0x3a3446 });
+    this.tutLayer = c;
   }
 
   // ------------------------------------------------------------ modals

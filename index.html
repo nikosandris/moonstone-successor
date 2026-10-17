@@ -8,9 +8,9 @@
     <style>
       html, body { margin: 0; height: 100%; background: #07070d; color: #ece4d4; font-family: system-ui, sans-serif; overflow: hidden; }
       #game { position: fixed; inset: 0; }
-      #setup { position: fixed; inset: 0; overflow: auto; display: flex; align-items: center; justify-content: center; background: radial-gradient(circle at 50% 25%, #2a2440, #07070d 70%); }
+      #setup { position: fixed; inset: 0; overflow: auto; display: flex; align-items: flex-start; justify-content: center; padding: 8px 0; box-sizing: border-box; background: radial-gradient(circle at 50% 25%, #2a2440, #07070d 70%); }
       #setup.hidden { display: none; }
-      .card { background: #15121f; border: 2px solid #6a5634; box-shadow: 0 0 60px rgba(0,0,0,0.7), inset 0 0 0 4px #15121f, inset 0 0 0 5px #2e2638; border-radius: 14px; padding: 18px 24px; max-width: 720px; width: 92%; }
+      .card { margin: auto; background: #15121f; border: 2px solid #6a5634; box-shadow: 0 0 60px rgba(0,0,0,0.7), inset 0 0 0 4px #15121f, inset 0 0 0 5px #2e2638; border-radius: 14px; padding: 18px 24px; max-width: 720px; width: 92%; }
       h1 { margin: 0 0 4px; font-size: 38px; letter-spacing: 6px; color: #e8d6a8; font-family: Georgia, 'Palatino Linotype', serif; text-shadow: 0 0 18px rgba(255,200,120,0.35); }
       .sub { margin: 0 0 14px; color: #a8a0bc; }
       .row { display: flex; gap: 8px; align-items: center; margin: 8px 0; flex-wrap: wrap; }
@@ -21,6 +21,24 @@
       .swatch { width: 36px; height: 36px; border-radius: 50%; border: 3px solid transparent; padding: 0; }
       .swatch.sel { border-color: #fff; }
       .count button.sel { background: #8c2f39; border-color: #c9a96a; }
+      .overlay { position: fixed; inset: 0; z-index: 50; background: rgba(4,3,8,0.78); display: flex; align-items: center; justify-content: center; }
+      .sheet { background: #15121f; border: 2px solid #6a5634; border-radius: 14px; width: min(760px, 94vw); max-height: 92vh; display: flex; flex-direction: column; box-shadow: 0 0 60px rgba(0,0,0,0.8); }
+      .sheet-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 18px; border-bottom: 1px solid #2e2638; }
+      .sheet-head h2 { margin: 0; font-family: Georgia, serif; color: #e8d6a8; letter-spacing: 2px; }
+      .sheet-body { overflow-y: auto; padding: 8px 20px 18px; line-height: 1.5; font-size: 17px; }
+      .sheet-body h3 { font-family: Georgia, serif; color: #ffd36a; margin: 14px 0 4px; }
+      .sheet-body ul { margin: 4px 0; padding-left: 22px; }
+      .count button.sel { background: #8c2f39; border-color: #c9a96a; }
+      .resume { background: #2f5a3a !important; }
+      @media (max-height: 460px) {
+        .card { padding: 10px 16px; }
+        h1 { font-size: 26px; }
+        .sub { margin-bottom: 6px; font-size: 14px; }
+        .row { margin: 4px 0; }
+        input[type=text], button, select { font-size: 15px; padding: 7px 10px; }
+        .swatch { width: 28px; height: 28px; }
+        button.big { padding: 10px; font-size: 20px; margin-top: 6px; }
+      }
     </style>
   </head>
   <body>

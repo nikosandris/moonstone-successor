@@ -79,3 +79,17 @@
 - `npm run build`: 0 errors.
 - `npm run sim` (1000 games): Sanctum 80.0%, average 22.6 days, seats 26.7 / 25.5 / 23.5 / 24.3% (max 26.7%). 1.82 level-ups per knight per game.
 - Playwright desktop + 800x360 touch: merchant, wisp, traveler, shrine, hermit events resolved by tapping; ambush fought in the arena to victory; level-up modal; summary screen. 0 console errors. Screenshots inspected.
+
+## M6 - Quality of life (done)
+
+**Changed**
+- Save/resume: the game autosaves after every action; the title screen offers "Resume: day N - names" (or Discard). Resuming restores the exact state, including mid-fight.
+- Interactive first-turn tutorial (6 spotlight steps; roll/move steps advance when you act; Skip anytime; runs once, can be re-enabled).
+- Rules screen ("How to play") from the title screen and the in-game Menu.
+- Settings (title screen and in-game Menu): duel mode, volume, mute, animation speed (slow/normal/fast/very fast - scales map and arena timing), blood on/off, tutorial on/off. In-game Menu also has Resume and Save-and-quit.
+- Setup screen fits and scrolls on 800x360.
+
+**Verification**
+- `npm test`: 120 pass (new: save round-trip, cleared on game over, corrupt saves ignored).
+- `npm run build`: 0 errors. Rules unchanged since M5 (sim: Sanctum 80.0%, 22.6 days, max seat 26.7%).
+- Playwright desktop + 800x360 touch: rules overlay, tutorial steps 1-5 (roll advances it), Menu with Very fast (timeScale 2 applied), reload -> Resume restores an identical state. 0 console errors. Screenshots inspected.

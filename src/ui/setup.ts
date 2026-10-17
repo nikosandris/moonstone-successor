@@ -1,4 +1,6 @@
-import type { PlayerSetup } from '../core/types';
+import type { GameState, PlayerSetup } from '../core/types';
+import { showRules, showSettings } from './overlays';
+import { clearSave, loadGame, saveInfo } from './save';
 import { getSettings, updateSettings } from './settings';
 import { PLAYER_COLORS, hex } from './theme';
 
@@ -11,7 +13,7 @@ interface Row {
 }
 
 /** DOM setup screen: 2-4 players, names, colours, optional bot seats. */
-export function showSetup(root: HTMLElement, onStart: (players: PlayerSetup[], seed: number) => void): void {
+export function showSetup(root: HTMLElement, onStart: (players: PlayerSetup[], seed: number) => void, onResume: (s: GameState) => void): void {
   let count = 2;
   const rows: Row[] = DEFAULT_NAMES.map((name, i) => ({ name, color: PLAYER_COLORS[i], bot: false }));
 
@@ -24,6 +26,26 @@ export function showSetup(root: HTMLElement, onStart: (players: PlayerSetup[], s
       <h1>MOONBLOOD</h1>
       <p class="sub">Hot-seat knights hunt four Seals. The Sanctum opens only under the Full moon.</p>
       <div class="row count"><label>Knights</label></div>`;
+    const info = saveInfo();
+    if (info) {
+      const res = document.createElement('div');
+      res.className = 'row';
+      const b = document.createElement('button');
+      b.className = 'resume';
+      b.textContent = `Resume: day ${info.day} - ${info.names.join(', ')}`;
+      b.style.flex = '1';
+      b.onclick = () => {
+        const s = loadGame();
+        if (!s) { clearSave(); render(); return; }
+        root.classList.add('hidden');
+        onResume(s);
+      };
+      const d = document.createElement('button');
+      d.textContent = 'Discard';
+      d.onclick = () => { clearSave(); render(); };
+      res.append(b, d);
+      card.insertBefore(res, card.querySelector('.count'));
+    }
     const countRow = card.querySelector('.count') as HTMLElement;
     for (const n of [2, 3, 4]) {
       const b = document.createElement('button');
@@ -81,22 +103,7 @@ export function showSetup(root: HTMLElement, onStart: (players: PlayerSetup[], s
       modeRow.appendChild(b);
     }
     card.appendChild(modeRow);
-    const volRow = document.createElement('div');
-    volRow.className = 'row';
-    const volLab = document.createElement('label');
-    volLab.textContent = 'Volume';
-    const vol = document.createElement('input');
-    vol.type = 'range';
-    vol.min = '0';
-    vol.max = '100';
-    vol.value = String(Math.round(getSettings().volume * 100));
-    vol.style.flex = '1';
-    vol.oninput = () => updateSettings({ volume: Number(vol.value) / 100, muted: false });
-    const mute = document.createElement('button');
-    mute.textContent = getSettings().muted ? 'Unmute' : 'Mute';
-    mute.onclick = () => { updateSettings({ muted: !getSettings().muted }); render(); };
-    volRow.append(volLab, vol, mute);
-    card.appendChild(volRow);
+
     const start = document.createElement('button');
     start.className = 'big';
     start.textContent = 'Begin the hunt';
@@ -110,6 +117,16 @@ export function showSetup(root: HTMLElement, onStart: (players: PlayerSetup[], s
       onStart(players, (Date.now() ^ (Math.random() * 0xffffffff)) >>> 0);
     };
     card.appendChild(start);
+    const extra = document.createElement('div');
+    extra.className = 'row';
+    const rulesBtn = document.createElement('button');
+    rulesBtn.textContent = 'How to play';
+    rulesBtn.onclick = () => showRules();
+    const setBtn = document.createElement('button');
+    setBtn.textContent = 'Settings';
+    setBtn.onclick = () => showSettings({ onChange: () => render() });
+    extra.append(rulesBtn, setBtn);
+    card.appendChild(extra);
     const tip = document.createElement('p');
     tip.className = 'sub';
     tip.style.marginTop = '12px';

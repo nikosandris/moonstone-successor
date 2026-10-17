@@ -29,3 +29,7 @@ One line each: decision - reasoning.
 - M5: Every monster has its own strong and weak moon phase (Dire Wolf strongest at Full, as in the original's werewolf-ish wolves) on top of the general moon effect.
 - M5: Roads trigger one of 7 weighted events 50% of the time; the bone-dice game is a fair bet (ties push) as a nod to the original's tavern gambling.
 - M5: Renown/level-ups (wins at 2, 4, 7, 11, 16) with a choice of 3 boons, offered at the start of the knight's own turn - borrows the roguelite "pick 1 of 3" hook and the original's XP-into-attributes; Warden raised to HP 66 / ATK 10 to keep game length in range.
+- M6: Autosave after every action to localStorage (whole plain state, versioned key); a corrupt or unknown save is ignored rather than crashing the title screen.
+- M6: Rules and Settings are DOM overlays (scrollable, real form controls, readable on phones) instead of Phaser modals; the in-game Menu adds Resume and "Save and quit to title".
+- M6: Tutorial = 6 coach marks on the first human turn; two steps wait for the real action (roll, move) instead of a Next button. Shown once, re-enable in Settings.
+- M6: Volume moved off the setup screen into Settings to keep setup usable at 800x360.
