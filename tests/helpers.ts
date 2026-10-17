@@ -5,7 +5,15 @@ export function setups(n: number): PlayerSetup[] {
   return Array.from({ length: n }, (_, i) => ({ name: `P${i + 1}`, color: 0x111111 * (i + 1) }));
 }
 
+/** New game with knight 0 to act and initiative 0,1,2... so scenarios can address players[0]. */
 export function newGame(n = 2, seed = 1): GameState {
+  const s = createGame(setups(n), seed);
+  s.order = s.players.map((p) => p.id);
+  s.current = 0;
+  return s;
+}
+
+export function rawGame(n = 2, seed = 1): GameState {
   return createGame(setups(n), seed);
 }
 

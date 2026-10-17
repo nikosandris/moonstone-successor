@@ -51,6 +51,7 @@ export function createGame(setups: PlayerSetup[], seed: number): GameState {
     day: 1,
     current: 0,
     step: 0,
+    order: players.map((p) => p.id),
     stage: 'roll',
     moveRoll: 0,
     players,
@@ -64,6 +65,8 @@ export function createGame(setups: PlayerSetup[], seed: number): GameState {
     stats: { itemUse: {} },
   };
   log(s, `The hunt begins. Day 1 - ${phaseForDay(1)} moon.`);
+  rollInitiative(s);
+  s.current = s.order[0];
   startTurn(s);
   return s;
 }
@@ -248,9 +251,26 @@ function advanceTurn(s: GameState): void {
     }
     log(s, `Day ${s.day} dawns - ${phaseForDay(s.day)} moon.`);
   }
-  // the knight who opens the day rotates, so nobody always moves first
-  s.current = (s.day - 1 + s.step) % n;
+  if (s.step === 0) rollInitiative(s);
+  s.current = s.order[s.step];
   startTurn(s);
+}
+
+/** Seeded shuffle of the day's turn order: every seat is equally likely to act first on any day. */
+function rollInitiative(s: GameState): void {
+  const rng = new Rng(s);
+  const order = s.players.map((p) => p.id);
+  for (let i = order.length - 1; i > 0; i--) {
+    const j = rng.int(0, i);
+    [order[i], order[j]] = [order[j], order[i]];
+  }
+  s.order = order;
+  log(s, `Initiative: ${order.map((id) => s.players[id].name).join(', ')}.`);
+}
+
+/** Knight who plays after the current one, or null if a new day (and new initiative) comes next. */
+export function nextKnightId(s: GameState): number | null {
+  return s.step + 1 < s.order.length ? s.order[s.step + 1] : null;
 }
 
 /** After a node has been resolved: PvP offer if a rival shares the node, otherwise end of turn. */

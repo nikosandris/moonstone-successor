@@ -170,8 +170,10 @@ export interface GameState {
   rng: number;
   day: number;
   current: number;
-  /** how many knights have already played this day (the first knight rotates daily) */
+  /** how many knights have already played this day */
   step: number;
+  /** turn order for the current day (knight ids), re-rolled every dawn so no seat is favoured */
+  order: number[];
   stage: Stage;
   moveRoll: number;
   players: Knight[];

@@ -3,7 +3,7 @@ import { botAction } from '../core/bot';
 import { allowedChoices, choiceCost } from '../core/combat';
 import {
   actorId, applyAction, buyCheck, canFlee, combatFighters, combatHp, createGame, fleeCost, healQuote,
-  stealableSeals,
+  nextKnightId, stealableSeals,
 } from '../core/game';
 import { reachable } from '../core/graph';
 import { daysUntilFull, isSanctumOpen, moonEffect, phaseForDay } from '../core/moon';
@@ -353,11 +353,12 @@ export class GameScene extends Phaser.Scene {
 
     // all knights
     const ky = H - 4 - 8 - s.players.length * 20 - 20;
-    addText(this, L, x0 + 4, ky, 'Knights', { size: 13, bold: true, color: COL.dim });
-    s.players.forEach((p, i) => {
+    addText(this, L, x0 + 4, ky, "Today's initiative", { size: 13, bold: true, color: COL.dim });
+    s.order.map((id) => s.players[id]).forEach((p, i) => {
       const yy = ky + 18 + i * 20;
-      this.uiLayer.add(this.add.circle(x0 + 12, yy + 8, 6, p.color).setStrokeStyle(p.id === s.current ? 2 : 0, 0xffffff));
-      addText(this, L, x0 + 24, yy, `${p.name}`, { size: 13, bold: p.id === s.current });
+      const done = i < s.step;
+      this.uiLayer.add(this.add.circle(x0 + 12, yy + 8, 6, p.color, done ? 0.4 : 1).setStrokeStyle(p.id === s.current ? 2 : 0, 0xffffff));
+      addText(this, L, x0 + 24, yy, `${i + 1}. ${p.name}`, { size: 13, bold: p.id === s.current, color: done ? COL.dim : COL.text });
       addText(this, L, x0 + 150, yy, `HP ${p.hp}`, { size: 13, color: p.hp < 10 ? COL.bad : COL.text });
       addText(this, L, x0 + 214, yy, `${p.seals.length}◆`, { size: 13 });
       addText(this, L, x0 + 250, yy, `${p.gold}g`, { size: 13, color: COL.gold });
@@ -412,11 +413,12 @@ export class GameScene extends Phaser.Scene {
         break;
       }
       case 'turnEnd': {
-        const next = s.players[(s.day - 1 + s.step + 1) % s.players.length];
-        const lastOfDay = s.step + 1 >= s.players.length;
+        const nextId = nextKnightId(s);
+        const next = nextId !== null ? s.players[nextId] : null;
+        const lastOfDay = next === null;
         addText(this, L, 561, 446, 'Turn complete.', { size: 16, align: 'center', color: COL.dim });
         addButton(this, L, bx, 472, bw, 80, 'END TURN', () => this.dispatch({ type: 'endTurn' }), {
-          size: 24, fill: 0x2f7a4a, sub: lastOfDay ? 'Next: a new day dawns' : `Pass to ${next.name}`,
+          size: 24, fill: 0x2f7a4a, sub: lastOfDay ? 'Next: a new day dawns' : `Pass to ${next!.name}`,
         });
         break;
       }

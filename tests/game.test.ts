@@ -7,7 +7,7 @@ import { effectiveStats, shopPrice } from '../src/core/stats';
 import { CONFIG } from '../src/data/balance';
 import { BOARD } from '../src/data/board';
 import { SCARS } from '../src/data/scars';
-import { act, atNode, edit, fightToEnd, newGame, setups } from './helpers';
+import { act, atNode, edit, fightToEnd, newGame, rawGame, setups } from './helpers';
 
 describe('setup', () => {
   it('supports 2 to 4 players and rejects others', () => {
@@ -74,17 +74,26 @@ describe('movement', () => {
     s = act(s, { type: 'move', to: s.players[0].pos });
     expect(s.players[0].pos).toBe(newGame().players[0].pos);
   });
-  it('turn passes to the next knight and the day advances after a full round', () => {
+  it('every knight plays once per day in the rolled initiative order, then the day advances', () => {
     let s = newGame(3);
     const end = (st: typeof s) => act(edit(st, (d) => { d.stage = 'turnEnd'; }), { type: 'endTurn' });
+    const order = s.order;
+    expect([...order].sort()).toEqual([0, 1, 2]);
+    expect(s.current).toBe(order[0]);
     s = end(s);
-    expect(s.current).toBe(1);
+    expect(s.current).toBe(order[1]);
     expect(s.day).toBe(1);
     s = end(s);
+    expect(s.current).toBe(order[2]);
     s = end(s);
     expect(s.day).toBe(2);
-    // first knight of the day rotates
-    expect(s.current).toBe(1);
+    expect([...s.order].sort()).toEqual([0, 1, 2]);
+    expect(s.current).toBe(s.order[0]);
+  });
+  it('initiative is shuffled fairly: each seat opens the day about equally often', () => {
+    const firsts = [0, 0, 0, 0];
+    for (let seed = 1; seed <= 400; seed++) firsts[rawGame(4, seed).order[0]]++;
+    for (const f of firsts) expect(f).toBeGreaterThan(70);
   });
   it('the Limp scar reduces movement rolls (minimum 1)', () => {
     const base = act(newGame(2, 5), { type: 'roll' }).moveRoll;
@@ -387,7 +396,7 @@ describe('day cap', () => {
     edit(newGame(n), (d) => {
       d.day = CONFIG.dayCap;
       d.step = n - 1;
-      d.current = (CONFIG.dayCap - 1 + n - 1) % n;
+      d.current = d.order[n - 1];
       d.stage = 'turnEnd';
     });
   it('ends the game after day 40; most Seals wins', () => {
@@ -406,7 +415,7 @@ describe('day cap', () => {
     expect(s.winner).toBe(1);
   });
   it('does not end before the cap', () => {
-    const s = act(edit(lastTurnOfCap(2), (d) => { d.day = CONFIG.dayCap - 1; d.current = (d.day - 1 + 1) % 2; }), { type: 'endTurn' });
+    const s = act(edit(lastTurnOfCap(2), (d) => { d.day = CONFIG.dayCap - 1; }), { type: 'endTurn' });
     expect(s.stage).toBe('roll');
     expect(s.day).toBe(CONFIG.dayCap);
   });
