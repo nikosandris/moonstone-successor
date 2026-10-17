@@ -4,8 +4,11 @@
 - **axe**: "Viking battle axe" by Mikhail Antonov (CC Attribution) - https://sketchfab.com/3d-models/viking-battle-axe-b7123192adbf40f68043c57dd8ddcd15
 - **bogTroll**: "Troll" by SJunior3d (CC Attribution) - https://sketchfab.com/3d-models/troll-bceb1cb47186457c8571a23e6aff1b8e
 - **boneGolem**: "Drugdör The Golem Animated" by Phons (CC Attribution) - https://sketchfab.com/3d-models/drugdor-the-golem-animated-19c1855bdb2c4cdc89da2cfb64da48cf
+- **bush**: "Small Stylised Bush" by Parelaxel (CC Attribution) - https://sketchfab.com/3d-models/small-stylised-bush-a83fd7049a784ca6bc0095e7323451d0
 - **caveDrake**: "European Dragon" by Regina Cachoa (CC Attribution) - https://sketchfab.com/3d-models/european-dragon-82f393a2e6c048ad80c171ce3b3a7b87
+- **deadpine**: "Mid Poly Dead Pine Tree" by sujirour (CC Attribution) - https://sketchfab.com/3d-models/mid-poly-dead-pine-tree-84b73e8b6efb4ca7b47409c89689927a
 - **direWolf**: "wolf animated" by Paleo Modelist (CC Attribution) - https://sketchfab.com/3d-models/wolf-animated-79bd16a8c36a45c78ccd13b84b7ca99c
+- **ferns**: "Ferns Grass" by Star3D (CC Attribution) - https://sketchfab.com/3d-models/ferns-grass-45669699e1454dc0ae3d0eb40da0800f
 - **giantSpider**: "Animated Spider" by Shadocks (CC Attribution) - https://sketchfab.com/3d-models/animated-spider-af87017501fc44e39a33c220f2435100
 - **guardian**: "Lich" by Spinnee (CC Attribution) - https://sketchfab.com/3d-models/lich-4ad4ece50273473ba1d843797b8f4fa6
 - **house1**: "Medieval house | Generic Textures | Game ready" by by__Rx (CC Attribution) - https://sketchfab.com/3d-models/medieval-house-generic-textures-game-ready-3eb9e3b600264e2f99100fc43619497e
@@ -17,9 +20,10 @@
 - **lairgate**: "Stone Entrance" by DJMaesen (CC Attribution) - https://sketchfab.com/3d-models/stone-entrance-ea4a511423bd4a1dab2fe32665edd67e
 - **marshSerpent**: "Anacondas: 3D Adventure Game - Giant Anaconda" by Ziggertron (CC Attribution) - https://sketchfab.com/3d-models/anacondas-3d-adventure-game-giant-anaconda-a29e4ca5bca3481ca19b8480b75a2a96
 - **mill**: "Medieval mill" by eexaw (CC Attribution) - https://sketchfab.com/3d-models/medieval-mill-080f516a0b6b402092c1314913341db8
+- **pine**: "Pine Tree [Game-ready]" by Wenedi (^-^)/ (CC Attribution) - https://sketchfab.com/3d-models/pine-tree-game-ready-dc3fbd9205cf4027a4455d1f415e0478
 - **ruin_arch**: "Medieval Ruin Entrance" by BytesCrafter (CC Attribution) - https://sketchfab.com/3d-models/medieval-ruin-entrance-711292d5a5c343ceb675782b24f213ee
-- **ruin_columns**: "Broken Medieval column set" by Sousinho (CC Attribution) - https://sketchfab.com/3d-models/broken-medieval-column-set-962ed874cf9a4db5bc5405584c29b664
 - **ruin_wall**: "Monastery Wall Round Scan" by Pers Scans (CC Attribution) - https://sketchfab.com/3d-models/monastery-wall-round-scan-6c55700635b4472f822b3772fa5e9c24
 - **rustKnight**: "Knight with Cape ，auto-rigged, Idle / Walk / Run" by HI3D.cc (CC Attribution) - https://sketchfab.com/3d-models/knight-with-cape-auto-rigged-idle-walk-run-6640834cd5b64771ad99105b3c16c1a0
+- **spruce**: "Spruce Trees" by INT (CC Attribution) - https://sketchfab.com/3d-models/spruce-trees-43b4157fe30245a88e07141ad39bec27
 - **stonehenge**: "Stonehenge" by ruslans3d (CC Attribution) - https://sketchfab.com/3d-models/stonehenge-37cfc2bb99944703b5d57ea281030ca6
 - **sword**: "Chevalier Sword" by rubenve (CC Attribution) - https://sketchfab.com/3d-models/chevalier-sword-b2662f2666a844e8a1bd0e7c4a7672d8
