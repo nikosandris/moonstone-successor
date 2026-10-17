@@ -30,7 +30,8 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
-          git add tools/sketchfab public/assets/sf || true
+          git add -A tools/sketchfab
+          if [ -d public/assets/sf ]; then git add -A public/assets/sf; fi
           git diff --cached --quiet && exit 0
           git commit -m "Sketchfab ${{ inputs.mode }} results"
           git push
