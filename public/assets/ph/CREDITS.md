@@ -1,0 +1,25 @@
+# Poly Haven assets (CC0)
+
+- texture **grass**: Poly Haven "forrest_ground_01" (CC0) - https://polyhaven.com/a/forrest_ground_01
+- texture **moss**: Poly Haven "rocky_terrain_02" (CC0) - https://polyhaven.com/a/rocky_terrain_02
+- texture **dirt**: Poly Haven "forest_ground_04" (CC0) - https://polyhaven.com/a/forest_ground_04
+- texture **rock**: Poly Haven "aerial_rocks_02" (CC0) - https://polyhaven.com/a/aerial_rocks_02
+- texture **mud**: Poly Haven "brown_mud_leaves_01" (CC0) - https://polyhaven.com/a/brown_mud_leaves_01
+- HDRI **night**: Poly Haven "moonlit_golf" (CC0) - https://polyhaven.com/a/moonlit_golf
+- model **fir**: Poly Haven "fir_tree_01" (CC0) - https://polyhaven.com/a/fir_tree_01
+- model **fir_small**: Poly Haven "fir_sapling_medium" (CC0) - https://polyhaven.com/a/fir_sapling_medium
+- model **tree**: Poly Haven "tree_small_02" (CC0) - https://polyhaven.com/a/tree_small_02
+- model **tree2**: Poly Haven "island_tree_01" (CC0) - https://polyhaven.com/a/island_tree_01
+- model **rocks_a**: Poly Haven "rock_moss_set_01" (CC0) - https://polyhaven.com/a/rock_moss_set_01
+- model **rocks_b**: Poly Haven "rock_moss_set_02" (CC0) - https://polyhaven.com/a/rock_moss_set_02
+- model **boulder**: Poly Haven "boulder_01" (CC0) - https://polyhaven.com/a/boulder_01
+- model **cliff**: Poly Haven "namaqualand_cliff_02" (CC0) - https://polyhaven.com/a/namaqualand_cliff_02
+- model **cliff2**: Poly Haven "coastal_cliff_04" (CC0) - https://polyhaven.com/a/coastal_cliff_04
+- model **deadtree**: Poly Haven "dead_tree_trunk_02" (CC0) - https://polyhaven.com/a/dead_tree_trunk_02
+- model **lantern**: Poly Haven "Lantern_01" (CC0) - https://polyhaven.com/a/Lantern_01
+- model **barrel**: Poly Haven "Barrel_01" (CC0) - https://polyhaven.com/a/Barrel_01
+- model **crate**: Poly Haven "wooden_crate_01" (CC0) - https://polyhaven.com/a/wooden_crate_01
+- model **firepit**: Poly Haven "stone_fire_pit" (CC0) - https://polyhaven.com/a/stone_fire_pit
+- model **fort**: Poly Haven "modular_fort_01" (CC0) - https://polyhaven.com/a/modular_fort_01
+- model **fern**: Poly Haven "fern_02" (CC0) - https://polyhaven.com/a/fern_02
+- model **grass**: Poly Haven "grass_medium_01" (CC0) - https://polyhaven.com/a/grass_medium_01
