@@ -42,7 +42,8 @@ export function td(en: string): string {
 }
 
 // Chronicle lines are produced in English by the rules engine; they are matched against templates here.
-type LogRule = [RegExp, string];
+// A placeholder never spans a sentence break, so a glued multi-sentence line falls through to splitLog.
+type LogRule = { rx: RegExp; names: string[]; out: string };
 let logRules: LogRule[] | null = null;
 
 /** Translate a chronicle line by template (names inside are translated too). */
@@ -54,8 +55,9 @@ export function tlog(en: string): string {
 function rules(): LogRule[] {
   if (!logRules) {
     logRules = EL.log.map(([pat, out]) => {
-      const rx = pat.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\\\{\w+\\\}/g, '(.+?)');
-      return [new RegExp(`^${rx}$`), out] as LogRule;
+      const names = [...pat.matchAll(/\{(\w+)\}/g)].map((m) => m[1]);
+      const rx = pat.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\\\{\w+\\\}/g, '((?:(?![.!?]\\s).)+?)');
+      return { rx: new RegExp(`^${rx}$`), names, out };
     });
   }
   return logRules;
@@ -63,16 +65,17 @@ function rules(): LogRule[] {
 
 /** One whole line against the templates; placeholder values are looked up (or matched again) in turn. */
 function matchLog(en: string): string | null {
-  for (const [rx, out] of rules()) {
+  for (const { rx, names, out } of rules()) {
     const m = en.match(rx);
-    if (m) {
-      let i = 0;
-      // `{b_acc}` in a translation asks for a grammatical case of a data name (names key `acc:<English>`)
-      return out.replace(/\{\w+?(?:_(\w+))?\}/g, (_, form?: string) => {
-        const v = m[++i] ?? '';
-        return (form ? EL.names[`${form}:${v}`] : undefined) ?? EL.names[v] ?? EL.desc[v] ?? (v.length < en.length ? matchLog(v) ?? splitLog(v) : null) ?? v;
-      });
-    }
+    if (!m) continue;
+    let pos = 0;
+    // placeholders are matched by name (`{b}` in the translation is `{b}` in the English); unknown names go in order.
+    // `{b_acc}` asks for a grammatical case of a data name (names key `acc:<English>`)
+    return out.replace(/\{(\w+?)(?:_(\w+))?\}/g, (_, key: string, form?: string) => {
+      const at = names.indexOf(key);
+      const v = m[at >= 0 ? at + 1 : ++pos] ?? '';
+      return (form ? EL.names[`${form}:${v}`] : undefined) ?? EL.names[v] ?? EL.desc[v] ?? (v.length < en.length ? matchLog(v) ?? splitLog(v) : null) ?? v;
+    });
   }
   return null;
 }

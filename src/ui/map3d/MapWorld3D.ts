@@ -18,6 +18,7 @@ import { drawMoon } from '../art/textures';
 import { Actor3D } from '../arena3d/Actor3D';
 import { MONSTER_LOOK } from '../arena3d/Arena3D';
 import { sfReady } from '../arena3d/assets3d';
+import { getLang, t, tn } from '../i18n';
 import { lowGraphics } from '../settings';
 import { SEAL_COLORS } from '../theme';
 import { ModelScatter, mapEnv, mapTexture, placeModel, type MapModel } from './mapAssets';
@@ -357,7 +358,7 @@ export class MapWorld3D {
       if (n.type !== 'road') {
         const l = document.createElement('div');
         l.className = `m3d-label t-${n.type}`;
-        l.innerHTML = `<span>${n.type === 'sanctum' ? 'The Sanctum' : n.type === 'home' ? 'Keep' : n.name}</span>`;
+        l.innerHTML = `<span>${n.type === 'sanctum' ? tn('The Sanctum') : n.type === 'home' ? tn('Keep') : tn(n.name)}</span>`;
         this.labels.appendChild(l);
         place.label = l;
       }
@@ -534,8 +535,17 @@ export class MapWorld3D {
 
   // ---------------------------------------------------------------- state -> scene
 
+  private labelLang = '';
+
   update(view: MapView): void {
     const first = !this.view;
+    if (getLang() !== this.labelLang) {
+      this.labelLang = getLang();
+      this.homesBuilt = '';
+      for (const pl of this.places) {
+        if (pl.label && pl.node.type !== 'home') pl.label.innerHTML = `<span>${pl.node.type === 'sanctum' ? tn('The Sanctum') : tn(pl.node.name)}</span>`;
+      }
+    }
     this.view = view;
     const s = view.state;
     this.applyPhase(phaseForDay(s.day), isSanctumOpen(s.day));
@@ -634,7 +644,7 @@ export class MapWorld3D {
         pl.home.add(pool);
       }
       if (pl.label) {
-        pl.label.innerHTML = `<span>${owner ? `${owner.name}'s Keep` : 'Empty Keep'}</span>`;
+        pl.label.innerHTML = `<span>${owner ? t("{name}'s Keep", { name: owner.name }) : t('Empty Keep')}</span>`;
         pl.label.style.setProperty('--c', hexc);
       }
     }

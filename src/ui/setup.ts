@@ -1,6 +1,7 @@
 import type { GameState, PlayerSetup } from '../core/types';
 import { t } from './i18n';
-import { langPicker, showRules, showSettings } from './overlays';
+import { langPicker, showSettings } from './overlays';
+import { showCodex } from './codex';
 import { clearSave, loadGame, saveInfo } from './save';
 import { getSettings, updateSettings } from './settings';
 import { PLAYER_COLORS, hex } from './theme';
@@ -27,7 +28,6 @@ export function showSetup(root: HTMLElement, onStart: (players: PlayerSetup[], s
       <h1>MOONBLOOD</h1>
       <p class="sub">${t('Hot-seat knights hunt four Seals. The Sanctum opens only under the Full moon.')}</p>
       <div class="row count"><label>${t('Knights')}</label></div>`;
-    card.insertBefore(langPicker(() => render()), card.firstChild);
     const info = saveInfo();
     if (info) {
       const res = document.createElement('div');
@@ -123,7 +123,7 @@ export function showSetup(root: HTMLElement, onStart: (players: PlayerSetup[], s
     extra.className = 'row';
     const rulesBtn = document.createElement('button');
     rulesBtn.textContent = t('How to play');
-    rulesBtn.onclick = () => showRules();
+    rulesBtn.onclick = () => showCodex();
     const setBtn = document.createElement('button');
     setBtn.textContent = t('Settings');
     setBtn.onclick = () => showSettings({ onChange: () => render() });
@@ -134,6 +134,7 @@ export function showSetup(root: HTMLElement, onStart: (players: PlayerSetup[], s
     tip.style.marginTop = '12px';
     tip.textContent = t('Tip: tick "Bot" to let the computer play a seat. Duels hide choices behind a pass-the-device screen.');
     card.appendChild(tip);
+    card.insertBefore(langPicker(() => render()), card.firstChild);
     root.appendChild(card);
   };
   render();

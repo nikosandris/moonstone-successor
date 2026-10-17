@@ -22,7 +22,8 @@ import { is3dReady, preload3d, preloadAllSf, webgl2Available } from './arena3d/a
 import { loadMapAssets } from './map3d/mapAssets';
 import { MapWorld3D } from './map3d/MapWorld3D';
 import { getLang, t, td, tlog, tn } from './i18n';
-import { showRules, showSettings } from './overlays';
+import { showSettings } from './overlays';
+import { showCodex } from './codex';
 import { MapHud, type TutorialStep } from './hud/MapHud';
 import { saveGame } from './save';
 import { getSettings, onSettings, updateSettings } from './settings';
@@ -146,7 +147,7 @@ export class GameScene extends Phaser.Scene {
     this.hud = new MapHud({
       dispatch: (a) => this.dispatch(a),
       onMenu: () => showSettings({ inGame: true, onQuit: () => this.onExit(), onChange: () => this.render() }),
-      onHelp: () => showRules(),
+      onHelp: () => showCodex(),
       nodeScreen: (id) => this.map3d?.screenOf(id, 1) ?? null,
       onToggleSound: () => { updateSettings({ muted: !getSettings().muted }); this.render(); },
       onExit: () => this.onExit(),

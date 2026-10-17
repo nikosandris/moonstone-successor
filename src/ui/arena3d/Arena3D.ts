@@ -14,6 +14,7 @@ import { t, td, tlog, tn } from '../i18n';
 import { getSettings, reactionScale } from '../settings';
 import { hex } from '../theme';
 import { icon } from '../hud/icons';
+import { showCodex } from '../codex';
 import { Actor3D, type ActorLook } from './Actor3D';
 import { World3D, type Stage3D } from './World3D';
 
@@ -84,6 +85,8 @@ const CSS = `
 .a3d-intent .tx small b.r{color:#ff6a50}.a3d-intent .tx small b.g{color:#ffd23a}
 .a3d-intent.k-guard{--k:#3aa0ff}.a3d-intent.k-strike{--k:#ff3a1c}.a3d-intent.k-feint{--k:#ffc030;animation:a3dflick .18s steps(2) infinite}.a3d-intent.k-windup{--k:#b9b0d8}
 @keyframes a3dflick{50%{filter:brightness(1.6)}}
+.a3d-how{position:absolute;left:1.2em;bottom:1.2em;width:2.6em;height:2.6em;border:0;border-radius:50%;cursor:pointer;color:#9fe3ff;display:grid;place-items:center;background:radial-gradient(circle at 50% 35%,#2c2338,#0d0a12);box-shadow:0 0 0 1px #000,0 0 0 2px var(--gold-lo),0 6px 14px #000a;z-index:2}
+.a3d-how .ico{width:1.3em;height:1.3em}
 .a3d-pop{position:absolute;pointer-events:none;transform:translate(-50%,0);animation:a3dpop 1.15s ease-out forwards;white-space:nowrap}
 @keyframes a3dpop{0%{transform:translate(-50%,.3em) scale(.5);opacity:0}14%{transform:translate(-50%,-.3em) scale(1.25);opacity:1}30%{transform:translate(-50%,-.5em) scale(1)}100%{transform:translate(-50%,-2.8em) scale(.95);opacity:0}}
 .a3d-arc{position:absolute;left:50%;bottom:8.3em;transform:translateX(-50%);width:26em;height:4.4em;opacity:0;transition:opacity .15s;overflow:visible}
@@ -306,6 +309,11 @@ export class Arena3D {
     const items = el('div', 'a3d-items');
     const itemsR = el('div', 'a3d-items r');
     const intent = el('div', 'a3d-intent');
+    // how fights work, any time
+    const how = el('button', 'a3d-how', `${icon('help')}`);
+    how.title = t('How fights work');
+    how.addEventListener('click', () => showCodex('combat'));
+    this.hud.append(how);
     this.hud.append(plates.a, plates.b, title, log, banner, timing, help, items, itemsR, controls, intent);
     this.els = {
       plates, title, banner, log, timing, tfill: timing.querySelector('.prog') as unknown as HTMLDivElement, tmark: timing.querySelector('.mark') as unknown as HTMLDivElement,
