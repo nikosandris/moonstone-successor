@@ -213,6 +213,16 @@ export class MapWorld3D {
       this.gtao = new GTAOPass(this.scene, this.camera, 512, 512);
       this.gtao.blendIntensity = 0.9;
       this.gtao.updateGtaoMaterial({ radius: 0.6, distanceExponent: 1.4, thickness: 1.2, scale: 1 });
+      // glow sprites, light beams and rings are not surfaces: keep them out of the occlusion pass
+      // (otherwise each one shades a dark rectangle around itself)
+      const g = this.gtao as unknown as { _overrideVisibility: () => void; _visibilityCache: THREE.Object3D[]; scene: THREE.Scene };
+      g._overrideVisibility = () => {
+        g.scene.traverse((o) => {
+          const m = (o as THREE.Mesh).material as THREE.Material | undefined;
+          const skip = (o as THREE.Sprite).isSprite || (o as THREE.Points).isPoints || (o as THREE.Line).isLine || (m && (m.transparent || !m.visible || (m as THREE.ShaderMaterial).isShaderMaterial));
+          if (skip && o.visible && o !== this.water) { o.visible = false; g._visibilityCache.push(o); }
+        });
+      };
       this.composer.addPass(this.gtao);
     }
     this.composer.addPass(new UnrealBloomPass(new THREE.Vector2(512, 512), 0.5, 0.55, 0.85));

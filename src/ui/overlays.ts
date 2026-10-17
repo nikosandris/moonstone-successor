@@ -118,6 +118,7 @@ export function showSettings(opts: { inGame?: boolean; onQuit?: () => void; onCh
     vol.style.flex = '1';
     row('Volume', vol);
     row('Sound', group([['on', 'On'], ['off', 'Muted']], s.muted ? 'off' : 'on', (v) => updateSettings({ muted: v === 'off' })));
+    row('Graphics', group([['auto', 'Auto'], ['high', 'High'], ['low', 'Low (faster)']], s.graphics, (v) => updateSettings({ graphics: v as Settings['graphics'] })));
     row('Reaction time', group([['relaxed', 'Relaxed'], ['normal', 'Normal'], ['expert', 'Expert']], s.reaction, (v) => updateSettings({ reaction: v as Settings['reaction'] })));
     row('Animation', group([['0.75', 'Slow'], ['1', 'Normal'], ['1.5', 'Fast'], ['2', 'Very fast']], String(s.animSpeed), (v) => updateSettings({ animSpeed: Number(v) })));
     row('Blood', group([['on', 'On'], ['off', 'Off (sparks)']], s.blood ? 'on' : 'off', (v) => updateSettings({ blood: v === 'on' })));

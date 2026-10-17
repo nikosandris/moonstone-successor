@@ -26,7 +26,7 @@ import { showSettings } from './overlays';
 import { showCodex } from './codex';
 import { MapHud, type TutorialStep } from './hud/MapHud';
 import { saveGame } from './save';
-import { getSettings, onSettings, updateSettings } from './settings';
+import { getSettings, lowGraphics, onSettings, updateSettings } from './settings';
 import { addBar, addButton, addPanel, addText } from './widgets';
 
 interface SceneData {
@@ -80,6 +80,7 @@ export class GameScene extends Phaser.Scene {
   private hud!: MapHud;
   /** the 3D diorama board; null until its models load, or when WebGL2 is unavailable (2D map then) */
   private map3d: MapWorld3D | null = null;
+  private mapLow = false;
   private tutSteps: TutorialStep[] | null = null;
 
   // hot-seat duel flow (choices stay in memory until the reveal)
@@ -257,6 +258,7 @@ export class GameScene extends Phaser.Scene {
 
   private openMap3d(): void {
     if (!this.sys || !this.sys.isActive() || this.map3d) return;
+    this.mapLow = lowGraphics();
     try {
       this.map3d = new MapWorld3D({
         onNodeClick: (id) => this.onNodeTap(id),
@@ -304,6 +306,13 @@ export class GameScene extends Phaser.Scene {
     this.infoText.setText(this.infoNode !== null ? this.nodeInfo(BOARD.nodes[this.infoNode]) : t('Tap any node for details.'));
 
     const s = this.state;
+    // the Graphics setting rebuilds the board with the other renderer profile
+    if (this.map3d && this.mapLow !== lowGraphics()) {
+      this.map3d.dispose();
+      this.map3d = null;
+      this.openMap3d();
+      return;
+    }
     if (this.map3d) {
       this.map3d.update({ state: s, reach: this.reachNow() });
       // every fight covers the board; the Phaser canvas is only needed for the 2D and classic fights

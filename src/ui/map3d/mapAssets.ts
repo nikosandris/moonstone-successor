@@ -26,6 +26,8 @@ function prepare(scene: THREE.Object3D): THREE.Object3D {
   scene.traverse((o) => {
     const mesh = o as THREE.Mesh;
     if (!mesh.isMesh) return;
+    // unlit exports often carry no normals: lighting them needs some
+    if (!mesh.geometry.getAttribute('normal')) mesh.geometry.computeVertexNormals();
     const fix = (m: THREE.Material): THREE.Material => {
       let mat = m as THREE.MeshStandardMaterial;
       if ((m as THREE.MeshBasicMaterial).isMeshBasicMaterial) {
