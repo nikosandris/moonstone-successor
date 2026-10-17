@@ -566,6 +566,22 @@ export function healQuote(k: Knight): { hp: number; cost: number } {
   return { hp, cost: Math.ceil(hp * unit) };
 }
 
+/**
+ * The move the monster will make this round if side a acts now. Exact, because the monster draws its
+ * move from the RNG before anything else when side a chooses. The arena uses it to telegraph.
+ */
+export function previewMonsterChoice(s: GameState): Choice | null {
+  const c = s.combat;
+  if (!c || c.over || c.kind === 'pvp' || !c.monsterId) return null;
+  const holder = { rng: s.rng };
+  return monsterChoose(
+    getMonster(c.monsterId),
+    combatFighters(s).b,
+    { round: c.round, lastSelf: c.lastB, lastOther: c.lastA, lastWinner: c.lastWinner },
+    new Rng(holder),
+  );
+}
+
 export function canFlee(s: GameState): boolean {
   const c = s.combat;
   return !!c && !c.over && c.kind !== 'pvp' && c.round === 0 && c.choiceA === null;

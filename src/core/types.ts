@@ -67,7 +67,14 @@ export interface MonsterDef {
   goldMax: number;
   lootTier: 1 | 2 | 3 | 4;
   hint: string;
+  /** arena: reaction window in ms between the start of the wind-up and the impact */
+  tellMs: number;
+  /** arena: silhouette family and body colour */
+  shape: MonsterShape;
+  color: number;
 }
+
+export type MonsterShape = 'beast' | 'brute' | 'armored' | 'drake' | 'wraith' | 'spider' | 'serpent' | 'golem';
 
 export interface ScarEffect {
   attack?: number;

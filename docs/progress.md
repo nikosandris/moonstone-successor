@@ -15,3 +15,20 @@
 
 **Known issues**
 - With 1000 games the per-seat share still varies by about +-1.5 points from noise.
+
+## M2 - Real-time arena duel (done)
+
+**Changed**
+- New `ArenaScene` (src/ui/arena): side-view duel with procedural fighters (`Fighter.ts`: knight in player colour plus 8 monster silhouette families).
+- Each exchange: prep (items, Flee and FIGHT on round 1) -> reaction window -> impact animation -> result. Monsters telegraph the move the engine will play: blue ward = Guard, red glow = Strike, flickering gold = Feint (Strike and Feint look the same for the first 55% of the wind-up).
+- Controls: keyboard J/K/L (also A/S/D, 1/2/3, arrows), Space/Enter for FIGHT/Continue; large touch buttons. Duels: simultaneous hidden input, left A/S/D vs right J/K/L, or each half of the screen on touch.
+- Core: `previewMonsterChoice(state)` (pure, exact). Setting "Duels: Arena / Classic duel" on the setup screen (saved in localStorage).
+
+**Verification**
+- `npm test`: 101 pass (new test: preview always equals the move the engine plays, 20 seeds x 6 rounds).
+- `npm run build`: 0 errors. `npm run sim`: unchanged rules - Sanctum 76.9%, avg 24.5 days, max seat 27.1%.
+- Playwright: desktop lair fight played with keys to victory; two-human keyboard duel (state stays empty until the clash, reaches loot screen); 800x360 touch lair fight to the end; full 4-bot game in arena mode ran to day 40 with no stalls. 0 console errors. Screenshots inspected.
+
+**Known issues**
+- Bot knights in duels do not telegraph (knight moves are secret by design).
+- Art is still flat placeholder shapes (M3).

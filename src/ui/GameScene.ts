@@ -17,6 +17,7 @@ import { getScar } from '../data/scars';
 import {
   COL, H, NODE_COLOR, NODE_GLYPH, NODE_LABEL, SEAL_COLORS, W, hex,
 } from './theme';
+import { getSettings } from './settings';
 import { addBar, addButton, addPanel, addText } from './widgets';
 
 interface SceneData {
@@ -131,8 +132,10 @@ export class GameScene extends Phaser.Scene {
     this.drawPanel();
     this.drawBottom();
     const s = this.state;
+    const arena = s.stage === 'combat' && getSettings().duelMode === 'arena';
+    this.syncArena(arena);
     if (s.stage === 'shop') this.drawShop();
-    else if (s.stage === 'combat') this.drawCombat();
+    else if (s.stage === 'combat' && !arena) this.drawCombat();
     else if (s.stage === 'pvpLoot') this.drawPvpLoot();
     else if (s.stage === 'gameOver') this.drawGameOver();
     this.scheduleBot();
@@ -140,9 +143,21 @@ export class GameScene extends Phaser.Scene {
 
   // ------------------------------------------------------------ bots
 
+  /** The arena is a separate scene layered on top; it drives fights (including bot moves) itself. */
+  private syncArena(on: boolean): void {
+    const active = this.scene.isActive('Arena') || this.scene.isPaused('Arena');
+    if (on && !active) {
+      this.scene.launch('Arena', { host: { getState: () => this.state, dispatch: (a: Action) => this.dispatch(a) } });
+      this.scene.bringToTop('Arena');
+    }
+    if (!on && active) this.scene.stop('Arena');
+    this.input.enabled = !on;
+  }
+
   private scheduleBot(): void {
     const s = this.state;
     if (s.stage === 'gameOver') return;
+    if (s.stage === 'combat' && getSettings().duelMode === 'arena') return;
     let action: Action | null = null;
     let delay = 650;
     const c = s.combat;

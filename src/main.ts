@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { ArenaScene } from './ui/arena/ArenaScene';
 import { GameScene } from './ui/GameScene';
 import { showSetup } from './ui/setup';
 import { H, W } from './ui/theme';
@@ -18,6 +19,7 @@ function start(players: PlayerSetup[], seed: number): void {
     scene: [],
     render: { antialias: true },
   });
+  game.scene.add('Arena', ArenaScene, false);
   game.scene.add('Game', GameScene, true, {
     players,
     seed,

@@ -1,4 +1,5 @@
 import type { PlayerSetup } from '../core/types';
+import { getSettings, updateSettings } from './settings';
 import { PLAYER_COLORS, hex } from './theme';
 
 const DEFAULT_NAMES = ['Aldric', 'Brenna', 'Corwin', 'Dara'];
@@ -67,6 +68,19 @@ export function showSetup(root: HTMLElement, onStart: (players: PlayerSetup[], s
       el.appendChild(botLab);
       card.appendChild(el);
     }
+    const modeRow = document.createElement('div');
+    modeRow.className = 'row count';
+    const modeLab = document.createElement('label');
+    modeLab.textContent = 'Duels';
+    modeRow.appendChild(modeLab);
+    for (const [mode, text] of [['arena', 'Arena (real-time)'], ['classic', 'Classic duel']] as const) {
+      const b = document.createElement('button');
+      b.textContent = text;
+      if (getSettings().duelMode === mode) b.className = 'sel';
+      b.onclick = () => { updateSettings({ duelMode: mode }); render(); };
+      modeRow.appendChild(b);
+    }
+    card.appendChild(modeRow);
     const start = document.createElement('button');
     start.className = 'big';
     start.textContent = 'Begin the hunt';

@@ -143,3 +143,18 @@ describe('full fights through the engine', () => {
     expect(s.players[loser].hp).toBe(0);
   });
 });
+
+describe('monster move preview (arena telegraphs)', () => {
+  it('matches the move the engine then plays, every round', async () => {
+    const { previewMonsterChoice } = await import('../src/core/game');
+    for (let seed = 1; seed <= 20; seed++) {
+      let s = act(atNode(newGame(2, seed), 8), { type: 'move', to: 8 });
+      s = edit(s, (d) => { d.players[0].baseMaxHp = 999; d.players[0].hp = 999; });
+      for (let r = 0; r < 6 && s.combat && !s.combat.over; r++) {
+        const predicted = previewMonsterChoice(s);
+        s = applyAction(s, { type: 'choose', side: 'a', choice: 'guard' });
+        expect(s.combat!.lastB).toBe(predicted);
+      }
+    }
+  });
+});
