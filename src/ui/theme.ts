@@ -4,19 +4,21 @@ export const W = 1024;
 export const H = 576;
 
 export const FONT = 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+export const SERIF = 'Georgia, "Palatino Linotype", "Book Antiqua", Palatino, serif';
 
 export const COL = {
-  bg: 0x0b0d17,
-  panel: 0x151833,
-  panelEdge: 0x3b4170,
+  bg: 0x07070d,
+  panel: 0x15121f,
+  panelEdge: 0x6a5634,
   edge: 0x4a5290,
-  text: '#e8e6f0',
-  dim: '#9aa0cc',
+  text: '#ece4d4',
+  dim: '#a8a0bc',
   good: '#7ee08a',
   bad: '#ff7b7b',
   gold: '#ffd166',
-  btn: 0x3b3f8a,
-  btnHot: 0x5b3fd0,
+  btn: 0x40305e,
+  btnHot: 0x6a4fc0,
+  primary: 0x8c2f39,
   btnOff: 0x2a2d4a,
   hp: 0xd9534f,
   sta: 0x4dabf7,

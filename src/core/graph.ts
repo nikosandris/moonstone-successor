@@ -50,3 +50,16 @@ export function homeNode(seat: number): number {
 }
 
 export const SANCTUM_ID = BOARD.nodes.find((n) => n.type === 'sanctum')!.id;
+
+/** One shortest path from a to b (inclusive), for animating tokens. */
+export function shortestPath(a: number, b: number): number[] {
+  const d = distancesFrom(b);
+  if (!Number.isFinite(d[a])) return [a];
+  const path = [a];
+  let cur = a;
+  while (cur !== b) {
+    cur = adj[cur].reduce((best, nb) => (d[nb] < d[best] ? nb : best), adj[cur][0]);
+    path.push(cur);
+  }
+  return path;
+}

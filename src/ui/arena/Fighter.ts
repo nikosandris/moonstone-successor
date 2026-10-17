@@ -25,7 +25,7 @@ const RIGS: Record<string, Rig> = {
   brute: { shoulder: [8, -120], armLen: 90, height: 175, rest: 70, raised: -120, swung: 25 },
   armored: { shoulder: [6, -100], armLen: 78, height: 155, rest: 60, raised: -115, swung: 20 },
   drake: { shoulder: [46, -110], armLen: 46, height: 150, rest: 30, raised: -55, swung: 35 },
-  wraith: { shoulder: [10, -120], armLen: 96, height: 180, rest: 50, raised: -125, swung: 15 },
+  wraith: { shoulder: [10, -120], armLen: 96, height: 180, rest: 25, raised: -125, swung: 15 },
   spider: { shoulder: [36, -48], armLen: 44, height: 80, rest: 20, raised: -70, swung: 30 },
   serpent: { shoulder: [30, -100], armLen: 40, height: 140, rest: 20, raised: -50, swung: 30 },
   golem: { shoulder: [10, -130], armLen: 84, height: 185, rest: 75, raised: -110, swung: 30 },
@@ -73,6 +73,10 @@ export class Fighter extends Phaser.GameObjects.Container {
     g.clear();
     const L = this.look;
     if (L.kind === 'knight') {
+      // cape
+      const dark = Phaser.Display.Color.ValueToColor(L.color).darken(35).color;
+      g.fillStyle(dark, 1);
+      g.fillTriangle(-18, -104, -46, -10, 0, -30);
       // legs
       g.fillStyle(0x2a2d3a, 1);
       g.fillRect(-16, -44, 12, 44);

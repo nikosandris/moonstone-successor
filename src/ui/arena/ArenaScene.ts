@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { botAction } from '../../core/bot';
 import { allowedChoices } from '../../core/combat';
 import { canFlee, combatFighters, combatHp, fleeCost, previewMonsterChoice } from '../../core/game';
-import { moonEffect } from '../../core/moon';
+import { moonEffect, phaseForDay } from '../../core/moon';
 import type { Action, Choice, GameState, Knight } from '../../core/types';
 import { getItem } from '../../data/items';
 import { getMonster } from '../../data/monsters';
@@ -45,6 +45,9 @@ export class ArenaScene extends Phaser.Scene {
   private locked: Partial<Record<Side, Choice>> = {};
   private botTime: Partial<Record<Side, number>> = {};
   private banner!: Phaser.GameObjects.Text;
+  private bloodFx!: Phaser.GameObjects.Particles.ParticleEmitter;
+  private sparkFx!: Phaser.GameObjects.Particles.ParticleEmitter;
+  private dustFx!: Phaser.GameObjects.Particles.ParticleEmitter;
 
   constructor() {
     super('Arena');
@@ -89,6 +92,7 @@ export class ArenaScene extends Phaser.Scene {
     }
     this.a.idle();
     this.b.idle();
+    this.createEmitters();
     this.hud = this.add.container(0, 0);
     this.fx = this.add.container(0, 0).setDepth(50);
     this.controls = this.add.container(0, 0).setDepth(60);
@@ -101,28 +105,109 @@ export class ArenaScene extends Phaser.Scene {
   // ---------------------------------------------------------------- scenery
 
   private drawBackdrop(): void {
+    const s = this.s;
+    const c = s.combat!;
+    const where = c.kind === 'guardian' ? 'sanctum' : c.kind === 'monster' ? 'lair' : 'field';
     const g = this.add.graphics();
-    g.fillGradientStyle(0x0d1030, 0x0d1030, 0x2a1f3a, 0x2a1f3a, 1);
+    const sky = where === 'lair' ? [0x120a0e, 0x2a1418] : where === 'sanctum' ? [0x0a0c22, 0x2a2450] : [0x0d1030, 0x2a1f3a];
+    g.fillGradientStyle(sky[0], sky[0], sky[1], sky[1], 1);
     g.fillRect(0, 0, W, GROUND);
-    // moon
-    g.fillStyle(0xf4f1d0, 0.08);
-    g.fillCircle(W / 2, 230, 80);
-    g.fillStyle(0xf4f1d0, 0.55);
-    g.fillCircle(W / 2, 230, 40);
-    // distant hills
-    g.fillStyle(0x161a33, 1);
-    g.beginPath();
-    g.moveTo(0, GROUND - 60);
-    for (let x = 0; x <= W; x += 64) g.lineTo(x, GROUND - 60 - Math.sin(x * 0.011) * 30 - Math.cos(x * 0.023) * 16);
-    g.lineTo(W, GROUND);
-    g.lineTo(0, GROUND);
-    g.closePath();
-    g.fillPath();
-    // ground
-    g.fillGradientStyle(0x221c26, 0x221c26, 0x0b0d17, 0x0b0d17, 1);
+    if (where !== 'lair') {
+      const phase = phaseForDay(s.day);
+      this.add.image(W / 2, 200, 'glow').setTint(0xf4f1d0).setAlpha(0.25).setScale(2.2).setBlendMode(Phaser.BlendModes.ADD);
+      this.add.image(W / 2, 200, `moon-${phase}`).setScale(0.62).setAlpha(0.9);
+    }
+    const ridge = (base: number, amp: number, color: number, f: number) => {
+      g.fillStyle(color, 1);
+      g.beginPath();
+      g.moveTo(0, GROUND);
+      for (let x = 0; x <= W; x += 16) g.lineTo(x, base - Math.sin(x * f + base) * amp - Math.cos(x * f * 2.3) * amp * 0.4);
+      g.lineTo(W, GROUND);
+      g.closePath();
+      g.fillPath();
+    };
+    if (where === 'lair') {
+      // cave: rock walls, an arch and hanging stalactites
+      ridge(GROUND - 120, 30, 0x1e1418, 0.02);
+      g.fillStyle(0x140c10, 1);
+      g.fillRect(0, 0, 120, GROUND);
+      g.fillRect(W - 120, 0, 120, GROUND);
+      g.fillEllipse(W / 2, -40, W * 1.1, 220);
+      for (let i = 0; i < 26; i++) {
+        const x = 40 + i * 38 + Math.sin(i * 7) * 10;
+        const h = 30 + ((i * 37) % 60);
+        g.fillTriangle(x - 10, 50, x + 10, 50, x, 50 + h);
+      }
+      this.torch(150, GROUND - 170);
+      this.torch(W - 150, GROUND - 170);
+    } else if (where === 'sanctum') {
+      ridge(GROUND - 70, 20, 0x14142a, 0.012);
+      for (const [x, h] of [[90, 210], [230, 250], [W - 230, 250], [W - 90, 210]] as const) {
+        g.fillStyle(0x2a2a3e, 1);
+        g.fillRect(x - 26, GROUND - h, 52, h);
+        g.fillStyle(0x3a3a52, 1);
+        g.fillRect(x - 26, GROUND - h, 12, h);
+      }
+      g.fillStyle(0x2a2a3e, 1);
+      g.fillRect(190, GROUND - 270, 90, 24);
+      g.fillRect(W - 280, GROUND - 270, 90, 24);
+      this.add.particles(0, 0, 'dot', {
+        x: { min: 0, max: W }, y: { min: 120, max: GROUND }, lifespan: 4000, speedY: { min: -14, max: -4 },
+        scale: { start: 0.5, end: 0 }, alpha: { start: 0.7, end: 0 }, tint: 0xffd88a, frequency: 140, blendMode: 'ADD',
+      });
+    } else {
+      ridge(GROUND - 80, 26, 0x161a33, 0.011);
+      ridge(GROUND - 40, 14, 0x10132a, 0.02);
+      for (let i = 0; i < 18; i++) {
+        const x = (i * 61 + 17) % W;
+        const h = 50 + ((i * 29) % 50);
+        g.fillStyle(0x0a0c1c, 1);
+        g.fillTriangle(x - h * 0.3, GROUND - 20, x + h * 0.3, GROUND - 20, x, GROUND - 20 - h);
+      }
+    }
+    // ground with pebbles
+    g.fillGradientStyle(0x2a2026, 0x2a2026, 0x0b0a10, 0x0b0a10, 1);
     g.fillRect(0, GROUND, W, H - GROUND);
-    g.lineStyle(2, 0x3a3048, 1);
+    for (let i = 0; i < 70; i++) {
+      g.fillStyle(0x3a3036, 0.6);
+      g.fillEllipse((i * 97) % W, GROUND + 6 + ((i * 53) % (H - GROUND - 10)), 6 + (i % 5) * 2, 3 + (i % 3));
+    }
+    g.lineStyle(2, 0x4a3a40, 1);
     g.lineBetween(0, GROUND, W, GROUND);
+    const fog = this.add.tileSprite(0, GROUND - 90, W, 140, 'fog').setOrigin(0, 0).setAlpha(where === 'lair' ? 0.12 : 0.2);
+    this.tweens.add({ targets: fog, tilePositionX: 512, duration: 40000, repeat: -1 });
+  }
+
+  private torch(x: number, y: number): void {
+    const g = this.add.graphics();
+    g.fillStyle(0x3a2a1a, 1);
+    g.fillRect(x - 4, y, 8, 40);
+    const glow = this.add.image(x, y - 6, 'glow').setTint(0xff8a30).setBlendMode(Phaser.BlendModes.ADD).setScale(2.2).setAlpha(0.5);
+    this.tweens.add({ targets: glow, alpha: { from: 0.35, to: 0.6 }, scale: { from: 2, to: 2.4 }, duration: 160, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    this.add.particles(x, y - 4, 'dot', {
+      speedY: { min: -60, max: -20 }, speedX: { min: -10, max: 10 }, lifespan: 700, scale: { start: 0.9, end: 0 },
+      tint: [0xffd060, 0xff7020, 0xff3010], blendMode: 'ADD', frequency: 40,
+    });
+  }
+
+  private createEmitters(): void {
+    this.bloodFx = this.add.particles(0, 0, 'dot', {
+      emitting: false, speed: { min: 120, max: 340 }, angle: { min: 200, max: 340 }, gravityY: 700, lifespan: 800,
+      scale: { start: 0.9, end: 0.2 }, tint: [0x8a0a0a, 0xb01818, 0xd02020],
+    }).setDepth(40);
+    this.sparkFx = this.add.particles(0, 0, 'spark', {
+      emitting: false, speed: { min: 220, max: 480 }, lifespan: 320, rotate: { min: 0, max: 360 },
+      scale: { start: 1.2, end: 0 }, tint: [0xffffff, 0xffe08a, 0x9fd8ff], blendMode: 'ADD',
+    }).setDepth(40);
+    this.dustFx = this.add.particles(0, 0, 'dot', {
+      emitting: false, speed: { min: 20, max: 70 }, angle: { min: 180, max: 360 }, lifespan: 600,
+      scale: { start: 0.8, end: 2 }, alpha: { start: 0.45, end: 0 }, tint: 0x8a7a6a,
+    }).setDepth(30);
+  }
+
+  private blood(x: number, y: number, n: number): void {
+    if (getSettings().blood) this.bloodFx.explode(n, x, y);
+    else this.sparkFx.explode(Math.ceil(n / 2), x, y);
   }
 
   // ---------------------------------------------------------------- HUD
@@ -243,7 +328,7 @@ export class ArenaScene extends Phaser.Scene {
     this.drawItemButtons('a', 20);
     if (c.kind === 'pvp') this.drawItemButtons('b', W - 170);
     if (c.round === 0 && (this.human('a') || this.human('b'))) {
-      addButton(this, this.controls, W / 2 - 130, 470, 260, 80, 'FIGHT!', () => this.startWindow(), { size: 30, fill: 0x5b3fd0, sub: 'Space / Enter' });
+      addButton(this, this.controls, W / 2 - 130, 470, 260, 80, 'FIGHT!', () => this.startWindow(), { size: 30, fill: COL.primary, sub: 'Space / Enter' });
       if (canFlee(s) && this.human('a')) {
         const cost = fleeCost(this.s.players[c.a]);
         addButton(this, this.controls, W / 2 + 150, 486, 160, 50, 'Flee', () => this.host.dispatch({ type: 'flee' }), { size: 18, fill: 0x555a80, sub: cost ? `-${cost} gold` : 'free' });
@@ -365,7 +450,14 @@ export class ArenaScene extends Phaser.Scene {
     this.b.perform(c.lastB ?? cb, res('b'), IMPACT_MS);
     const dmgA = hpA0 - combatHp(after, 'a').hp;
     const dmgB = hpB0 - combatHp(after, 'b').hp;
+    for (const [f, ch] of [[this.a, c.lastA ?? ca], [this.b, c.lastB ?? cb]] as const) {
+      if (ch !== 'guard') this.dustFx.explode(8, f.x, GROUND);
+    }
     this.time.delayedCall(IMPACT_MS * 0.35, () => {
+      const midX = (this.a.x + this.b.x) / 2;
+      if (winner === 'tie' || (c.lastA === 'guard' && winner === 'a') || (c.lastB === 'guard' && winner === 'b')) this.sparkFx.explode(18, midX, GROUND - 90);
+      if (dmgA > 0) this.blood(this.a.x, this.a.centerY, winner === 'b' ? 26 : 12);
+      if (dmgB > 0) this.blood(this.b.x, this.b.centerY, winner === 'a' ? 26 : 12);
       if (dmgA > 0) { this.a.hitReact(winner === 'b', IMPACT_MS); this.popText(this.a, `-${dmgA}${winner === 'b' ? '  x2' : ''}`, '#ff6b6b'); }
       if (dmgB > 0) { this.b.hitReact(winner === 'a', IMPACT_MS); this.popText(this.b, `-${dmgB}${winner === 'a' ? '  x2' : ''}`, '#ff6b6b'); }
       if (winner !== 'tie') this.cameras.main.shake(120, winner === 'a' ? 0.006 : 0.009);
@@ -392,7 +484,7 @@ export class ArenaScene extends Phaser.Scene {
     this.banner.setText(`${winnerName} is victorious!`).setFontSize(36).setAlpha(1);
     this.tweens.killTweensOf(this.banner);
     if (this.human('a') || this.human('b')) {
-      addButton(this, this.controls, W / 2 - 140, 480, 280, 70, 'Continue', () => this.finish(), { size: 24, fill: 0x5b3fd0, sub: 'Space / Enter' });
+      addButton(this, this.controls, W / 2 - 140, 480, 280, 70, 'Continue', () => this.finish(), { size: 24, fill: COL.primary, sub: 'Space / Enter' });
     } else this.time.delayedCall(1500, () => this.finish());
   }
 

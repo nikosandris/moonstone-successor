@@ -6,21 +6,21 @@
     <title>Moonblood</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%23f4f1d0'/%3E%3Ccircle cx='22' cy='12' r='12' fill='%230b0d17'/%3E%3C/svg%3E" />
     <style>
-      html, body { margin: 0; height: 100%; background: #0b0d17; color: #e8e6f0; font-family: system-ui, sans-serif; overflow: hidden; }
+      html, body { margin: 0; height: 100%; background: #07070d; color: #ece4d4; font-family: system-ui, sans-serif; overflow: hidden; }
       #game { position: fixed; inset: 0; }
-      #setup { position: fixed; inset: 0; overflow: auto; display: flex; align-items: center; justify-content: center; background: radial-gradient(circle at 50% 30%, #1d2040, #0b0d17); }
+      #setup { position: fixed; inset: 0; overflow: auto; display: flex; align-items: center; justify-content: center; background: radial-gradient(circle at 50% 25%, #2a2440, #07070d 70%); }
       #setup.hidden { display: none; }
-      .card { background: #171a30; border: 2px solid #3b4170; border-radius: 14px; padding: 18px 24px; max-width: 720px; width: 92%; }
-      h1 { margin: 0 0 4px; font-size: 34px; letter-spacing: 3px; color: #e9e4ff; }
-      .sub { margin: 0 0 14px; color: #9aa0cc; }
+      .card { background: #15121f; border: 2px solid #6a5634; box-shadow: 0 0 60px rgba(0,0,0,0.7), inset 0 0 0 4px #15121f, inset 0 0 0 5px #2e2638; border-radius: 14px; padding: 18px 24px; max-width: 720px; width: 92%; }
+      h1 { margin: 0 0 4px; font-size: 38px; letter-spacing: 6px; color: #e8d6a8; font-family: Georgia, 'Palatino Linotype', serif; text-shadow: 0 0 18px rgba(255,200,120,0.35); }
+      .sub { margin: 0 0 14px; color: #a8a0bc; }
       .row { display: flex; gap: 8px; align-items: center; margin: 8px 0; flex-wrap: wrap; }
       .row label { min-width: 90px; }
-      input[type=text] { flex: 1; min-width: 120px; font-size: 18px; padding: 10px; border-radius: 8px; border: 1px solid #4a5290; background: #0f1226; color: #fff; }
-      button, select { font-size: 18px; padding: 10px 14px; border-radius: 8px; border: 1px solid #4a5290; background: #262b57; color: #fff; cursor: pointer; }
-      button.big { width: 100%; padding: 16px; font-size: 22px; background: #5b3fd0; margin-top: 12px; }
+      input[type=text] { flex: 1; min-width: 120px; font-size: 18px; padding: 10px; border-radius: 8px; border: 1px solid #5a4a30; background: #0c0a14; color: #ece4d4; }
+      button, select { font-size: 18px; padding: 10px 14px; border-radius: 8px; border: 1px solid #6a5634; background: #2a2238; color: #ece4d4; cursor: pointer; }
+      button.big { width: 100%; padding: 16px; font-size: 24px; background: #8c2f39; margin-top: 12px; font-family: Georgia, serif; letter-spacing: 2px; }
       .swatch { width: 36px; height: 36px; border-radius: 50%; border: 3px solid transparent; padding: 0; }
       .swatch.sel { border-color: #fff; }
-      .count button.sel { background: #5b3fd0; }
+      .count button.sel { background: #8c2f39; border-color: #c9a96a; }
     </style>
   </head>
   <body>

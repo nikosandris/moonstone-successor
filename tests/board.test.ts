@@ -49,3 +49,16 @@ describe('board', () => {
     expect(distancesFrom(SANCTUM_ID)[SANCTUM_ID]).toBe(0);
   });
 });
+
+describe('shortestPath', () => {
+  it('walks adjacent nodes from start to end with the BFS length', async () => {
+    const { shortestPath } = await import('../src/core/graph');
+    for (const [a, b] of [[1, 0], [3, 8], [5, 5], [2, 4]]) {
+      const p = shortestPath(a, b);
+      expect(p[0]).toBe(a);
+      expect(p.at(-1)).toBe(b);
+      expect(p.length - 1).toBe(distancesFrom(a)[b]);
+      for (let i = 1; i < p.length; i++) expect(neighbors(p[i - 1])).toContain(p[i]);
+    }
+  });
+});

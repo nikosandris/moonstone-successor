@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { COL, FONT } from './theme';
+import { COL, FONT, SERIF } from './theme';
 
 export interface TextOpts {
   size?: number;
@@ -8,6 +8,7 @@ export interface TextOpts {
   align?: 'left' | 'center' | 'right';
   wrap?: number;
   origin?: [number, number];
+  serif?: boolean;
 }
 
 export function addText(
@@ -19,7 +20,7 @@ export function addText(
   o: TextOpts = {},
 ): Phaser.GameObjects.Text {
   const t = scene.add.text(x, y, str, {
-    fontFamily: FONT,
+    fontFamily: o.serif ? SERIF : FONT,
     fontSize: `${o.size ?? 16}px`,
     fontStyle: o.bold ? 'bold' : 'normal',
     color: o.color ?? COL.text,
@@ -54,7 +55,7 @@ export function addButton(
 ): Phaser.GameObjects.Rectangle {
   const enabled = o.enabled !== false;
   const fill = enabled ? o.fill ?? COL.btn : COL.btnOff;
-  const r = scene.add.rectangle(x, y, w, h, fill).setOrigin(0, 0).setStrokeStyle(2, enabled ? 0x8f97e0 : 0x3a3f66);
+  const r = scene.add.rectangle(x, y, w, h, fill).setOrigin(0, 0).setStrokeStyle(2, enabled ? 0xc9a96a : 0x3a3446);
   parent.add(r);
   const size = o.size ?? 18;
   const subSize = Math.max(12, size - 6);
@@ -90,6 +91,10 @@ export function addPanel(
 ): Phaser.GameObjects.Rectangle {
   const r = scene.add.rectangle(x, y, w, h, fill, alpha).setOrigin(0, 0).setStrokeStyle(2, COL.panelEdge);
   parent.add(r);
+  if (w > 60 && h > 40) {
+    const inner = scene.add.rectangle(x + 4, y + 4, w - 8, h - 8).setOrigin(0, 0).setStrokeStyle(1, 0x2e2638, alpha);
+    parent.add(inner);
+  }
   return r;
 }
 

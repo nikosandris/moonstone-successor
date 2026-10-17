@@ -5,7 +5,7 @@ import {
   actorId, applyAction, buyCheck, canFlee, combatFighters, combatHp, createGame, fleeCost, healQuote,
   nextKnightId, stealableSeals,
 } from '../core/game';
-import { reachable } from '../core/graph';
+import { reachable, shortestPath } from '../core/graph';
 import { daysUntilFull, isSanctumOpen, moonEffect, phaseForDay } from '../core/moon';
 import { effectiveStats, shopPrice } from '../core/stats';
 import type { Action, BoardNode, Choice, GameState, Knight, PlayerSetup } from '../core/types';
@@ -15,8 +15,9 @@ import { getItem } from '../data/items';
 import { getMonster } from '../data/monsters';
 import { getScar } from '../data/scars';
 import {
-  COL, H, NODE_COLOR, NODE_GLYPH, NODE_LABEL, SEAL_COLORS, W, hex,
+  COL, H, NODE_LABEL, SEAL_COLORS, W, hex,
 } from './theme';
+import { generateTextures } from './art/textures';
 import { getSettings } from './settings';
 import { addBar, addButton, addPanel, addText } from './widgets';
 
@@ -52,9 +53,14 @@ export class GameScene extends Phaser.Scene {
   private modalLayer!: Phaser.GameObjects.Container;
   private toastText!: Phaser.GameObjects.Text;
   private infoText!: Phaser.GameObjects.Text;
-  private pulse: Phaser.GameObjects.Shape[] = [];
+  private pulse: (Phaser.GameObjects.Shape | Phaser.GameObjects.Image)[] = [];
   private botTimer: Phaser.Time.TimerEvent | null = null;
   private infoNode: number | null = null;
+  private fog: Phaser.GameObjects.TileSprite[] = [];
+  private flicker: { light: Phaser.GameObjects.Light | null; glow: Phaser.GameObjects.Image | null; base: number; glowBase: number; seed: number }[] = [];
+  private sanctumLight: Phaser.GameObjects.Light | null = null;
+  private sanctumGlow: Phaser.GameObjects.Image | null = null;
+  private lastPos: number[] = [];
 
   // hot-seat duel flow (choices stay in memory until the reveal)
   private duelKey = '';
@@ -73,6 +79,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   create(): void {
+    generateTextures(this);
     this.add.rectangle(0, 0, W, H, COL.bg).setOrigin(0, 0);
     this.drawMapBackdrop();
     this.nodesLayer = this.add.container(0, 0);
@@ -89,12 +96,22 @@ export class GameScene extends Phaser.Scene {
     // ?speed=N shortens bot delays (used for automated checks)
     const speed = Number(new URLSearchParams(window.location.search).get('speed'));
     if (speed > 0) this.time.timeScale = speed;
+    this.lastPos = this.state.players.map((p) => p.pos);
     this.render();
   }
 
-  update(time: number): void {
+  update(time: number, delta: number): void {
     const a = 0.55 + 0.45 * Math.sin(time / 220);
     for (const p of this.pulse) if (p.active) p.setAlpha(a);
+    for (const [i, f] of this.fog.entries()) {
+      f.tilePositionX += delta * (0.008 + i * 0.006);
+      f.tilePositionY += delta * 0.002 * (i ? -1 : 1);
+    }
+    for (const fl of this.flicker) {
+      const v = 0.82 + 0.18 * Math.sin(time / (90 + fl.seed * 40) + fl.seed * 7) * Math.sin(time / 233 + fl.seed);
+      if (fl.light) fl.light.intensity = fl.base * v;
+      if (fl.glow) fl.glow.setAlpha(fl.glowBase * v);
+    }
   }
 
   // ------------------------------------------------------------ plumbing
@@ -186,21 +203,61 @@ export class GameScene extends Phaser.Scene {
   // ------------------------------------------------------------ map
 
   private drawMapBackdrop(): void {
-    const g = this.add.graphics();
-    g.fillStyle(0x10132a, 1);
-    g.fillRoundedRect(4, 18, 686, 412, 10);
-    g.lineStyle(2, 0x2a2f55, 1);
-    g.strokeRoundedRect(4, 18, 686, 412, 10);
-    g.lineStyle(4, 0x3b4170, 1);
-    for (const [a, b] of BOARD.edges) {
-      const na = BOARD.nodes[a];
-      const nb = BOARD.nodes[b];
-      g.lineBetween(mx(na.x), my(na.y), mx(nb.x), my(nb.y));
+    const mapW = 1000 * MAP_SCALE;
+    const mapH = 600 * MAP_SCALE;
+    const frame = this.add.graphics();
+    frame.fillStyle(0x07080f, 1);
+    frame.fillRoundedRect(4, 18, 686, 412, 10);
+    const terrain = this.add.image(MAP_X, MAP_Y, 'terrain').setOrigin(0, 0).setScale(MAP_SCALE / 1.34);
+    const webgl = this.game.renderer.type === Phaser.WEBGL;
+    if (webgl) {
+      terrain.setPipeline('Light2D');
+      this.lights.enable();
     }
+    // fog banks drifting over the moor
+    for (let i = 0; i < 2; i++) {
+      const f = this.add.tileSprite(MAP_X, MAP_Y, mapW, mapH, 'fog').setOrigin(0, 0).setAlpha(i ? 0.1 : 0.16).setTileScale(i ? 1.6 : 1.1);
+      this.fog.push(f);
+    }
+    // warm windows, torches at homes, a red glow from lairs, the Sanctum's light
+    for (const n of BOARD.nodes) {
+      const x = mx(n.x);
+      const y = my(n.y);
+      let color = 0;
+      let radius = 0;
+      let intensity = 0;
+      if (n.type === 'village') { color = 0xffa040; radius = 80; intensity = 1.6; }
+      else if (n.type === 'home') { color = this.state.players.find((p) => p.seat === n.seat)?.color ?? 0xffc070; radius = 64; intensity = 1.2; }
+      else if (n.type === 'lair') { color = 0xff4030; radius = 46; intensity = 1.0; }
+      else if (n.type === 'sanctum') { color = 0x9fb4ff; radius = 110; intensity = 0.9; }
+      if (!radius) continue;
+      const seed = n.id * 0.37;
+      const glow = this.add.image(x, y, 'glow').setTint(color).setBlendMode(Phaser.BlendModes.ADD).setScale(radius / 80).setAlpha(0.28);
+      const light = webgl ? this.lights.addLight(x, y, radius * 1.6, color, intensity) : null;
+      this.flicker.push({ light, glow, base: intensity, glowBase: 0.28, seed });
+      if (n.type === 'sanctum') { this.sanctumLight = light; this.sanctumGlow = glow; }
+    }
+    frame.lineStyle(3, 0x2a2f55, 1);
+    const border = this.add.graphics();
+    border.lineStyle(3, 0x3a3060, 1);
+    border.strokeRoundedRect(4, 18, 686, 412, 10);
+  }
+
+  /** Moonlight follows the phase: darkest at New, silver-bright at Full. */
+  private applyMoonlight(): void {
+    const phase = phaseForDay(this.state.day);
+    const amb = { new: 0x3c4466, waxing: 0x5a6390, full: 0x8c97c4, waning: 0x4e5680 }[phase];
+    if (this.game.renderer.type === Phaser.WEBGL) this.lights.setAmbientColor(amb);
+    const open = isSanctumOpen(this.state.day);
+    if (this.sanctumLight) {
+      this.sanctumLight.color.set(...(open ? [1, 0.85, 0.4] as const : [0.55, 0.65, 1] as const));
+      this.sanctumLight.radius = open ? 220 : 120;
+    }
+    this.sanctumGlow?.setTint(open ? 0xffd060 : 0x9fb4ff).setScale(open ? 2.4 : 1.3);
   }
 
   private nodeRadius(n: BoardNode): number {
-    return n.type === 'sanctum' ? 24 : n.type === 'road' ? 11 : 16;
+    return n.type === 'sanctum' ? 24 : n.type === 'road' ? 9 : 16;
   }
 
   private drawNodes(): void {
@@ -208,37 +265,47 @@ export class GameScene extends Phaser.Scene {
     const k = s.players[s.current];
     const reach = s.stage === 'move' && !this.actor.bot ? new Set(reachable(s.players[s.current].pos, s.moveRoll)) : new Set<number>();
     const open = isSanctumOpen(s.day);
+    this.applyMoonlight();
 
     for (const n of BOARD.nodes) {
       const x = mx(n.x);
       const y = my(n.y);
       const r = this.nodeRadius(n);
-      let fill = NODE_COLOR[n.type];
-      if (n.type === 'sanctum' && !open) fill = 0x7a6a35;
-      const ring = n.type === 'home' ? s.players.find((p) => p.seat === n.seat)?.color ?? 0x888888 : 0x0b0d17;
-      const circle = this.add.circle(x, y, r, fill).setStrokeStyle(n.type === 'home' ? 5 : 2, ring);
-      this.nodesLayer.add(circle);
-      if (n.type === 'sanctum' && open) {
-        const glow = this.add.circle(x, y, r + 8, 0xf2c94c, 0.25);
-        this.nodesLayer.add(glow);
-        this.nodesLayer.sendToBack(glow);
-        this.pulse.push(glow);
-      }
-      const glyph = NODE_GLYPH[n.type];
-      if (glyph) addText(this, this.nodesLayer, x, y - (n.type === 'sanctum' ? 12 : 9), glyph, { size: n.type === 'sanctum' ? 22 : 17, bold: true, align: 'center', color: '#0b0d17' });
-      addText(this, this.nodesLayer, x, y + r + 1, NODE_LABEL[n.type], { size: 11, align: 'center', color: n.type === 'road' ? '#7d82a6' : '#c9ccf0' });
-
-      if (n.type === 'lair') {
-        const holds = k.seals.includes(n.seal!);
-        const d = this.add.polygon(x + r + 9, y - 2, [0, -9, 8, 0, 0, 9, -8, 0], holds ? SEAL_COLORS[n.seal!] : 0x0b0d17).setStrokeStyle(2, SEAL_COLORS[n.seal!]);
-        this.nodesLayer.add(d);
-      }
       if (reach.has(n.id)) {
-        const hl = this.add.circle(x, y, r + 6).setStrokeStyle(4, 0xffffff).setFillStyle(0xffffff, 0.08);
+        const hl = this.add.ellipse(x, y + 4, r * 2.6 + 12, r * 1.2 + 10, 0xfff1c0, 0.3).setStrokeStyle(4, 0xffd36a);
         this.nodesLayer.add(hl);
         this.pulse.push(hl);
       }
-      const hit = this.add.circle(x, y, Math.max(r + 8, 20), 0xffffff, 0.001).setInteractive({ useHandCursor: true });
+      const icon = this.add.image(x, y + (n.type === 'road' ? 0 : 6), `icon-${n.type}`).setOrigin(0.5, n.type === 'road' ? 0.5 : 0.75).setScale(n.type === 'road' ? 0.55 : 0.5);
+      if (n.type === 'sanctum' && !open) icon.setTint(0x9aa0b8);
+      this.nodesLayer.add(icon);
+      if (n.type === 'home') {
+        const owner = s.players.find((p) => p.seat === n.seat);
+        if (owner) {
+          const g = this.add.graphics();
+          g.fillStyle(0x2a2a2a, 1);
+          g.fillRect(x + 8, y - 30, 2, 18);
+          g.fillStyle(owner.color, 1);
+          g.fillTriangle(x + 10, y - 30, x + 24, y - 26, x + 10, y - 21);
+          this.nodesLayer.add(g);
+        }
+      }
+      if (n.type === 'sanctum' && open) {
+        const ring = this.add.ellipse(x, y + 6, 76, 28).setStrokeStyle(3, 0xffd060, 0.9);
+        this.nodesLayer.add(ring);
+        this.pulse.push(ring);
+      }
+      if (n.type !== 'road') {
+        const label = n.type === 'sanctum' ? (open ? 'SANCTUM - OPEN' : 'SANCTUM') : NODE_LABEL[n.type];
+        const tl = addText(this, this.nodesLayer, x, y + (n.type === 'sanctum' ? 14 : 10), label, { size: 11, bold: n.type === 'sanctum', align: 'center', color: n.type === 'sanctum' && open ? '#ffd060' : '#d8d2c0' });
+        tl.setStroke('#05060a', 4);
+      }
+      if (n.type === 'lair') {
+        const holds = k.seals.includes(n.seal!);
+        const d = this.add.polygon(x + r + 8, y - 14, [0, -8, 7, 0, 0, 8, -7, 0], holds ? SEAL_COLORS[n.seal!] : 0x0b0d17).setStrokeStyle(2, SEAL_COLORS[n.seal!]);
+        this.nodesLayer.add(d);
+      }
+      const hit = this.add.circle(x, y - 4, Math.max(r + 8, 20), 0xffffff, 0.001).setInteractive({ useHandCursor: true });
       hit.on('pointerup', () => {
         if (reach.has(n.id)) this.dispatch({ type: 'move', to: n.id });
         else {
@@ -248,22 +315,49 @@ export class GameScene extends Phaser.Scene {
       });
       this.nodesLayer.add(hit);
     }
+    this.drawTokens();
+  }
 
-    // knight tokens
-    const byNode = new Map<number, Knight[]>();
-    for (const p of s.players) byNode.set(p.pos, [...(byNode.get(p.pos) ?? []), p]);
-    for (const [nodeId, list] of byNode) {
+  /** Knight tokens; a knight whose position changed walks there along the road. */
+  private drawTokens(): void {
+    const s = this.state;
+    const slot = (nodeId: number, p: Knight): [number, number] => {
       const n = BOARD.nodes[nodeId];
-      const x = mx(n.x);
-      const y = my(n.y) - this.nodeRadius(n) - 11;
-      list.forEach((p, i) => {
-        const tx = x + (i - (list.length - 1) / 2) * 20;
-        const isCur = p.id === s.current && s.stage !== 'gameOver';
-        const t = this.add.circle(tx, y, 10, p.color, p.downed ? 0.45 : 1).setStrokeStyle(isCur ? 4 : 2, isCur ? 0xffffff : 0x0b0d17);
-        this.nodesLayer.add(t);
-        addText(this, this.nodesLayer, tx, y - 8, String(p.id + 1), { size: 13, bold: true, align: 'center', color: '#0b0d17' });
-      });
+      const here = s.players.filter((q) => q.pos === nodeId);
+      const i = here.indexOf(p);
+      const ox = here.length > 1 ? (i - (here.length - 1) / 2) * 16 : 0;
+      return [mx(n.x) + ox, my(n.y) - this.nodeRadius(n) - 4];
+    };
+    for (const p of s.players) {
+      const isCur = p.id === s.current && s.stage !== 'gameOver';
+      const [tx, ty] = slot(p.pos, p);
+      const c = this.add.container(tx, ty);
+      if (isCur) {
+        const ring = this.add.ellipse(0, 2, 30, 10).setStrokeStyle(2, 0xffffff, 0.9);
+        c.add(ring);
+        this.pulse.push(ring);
+      }
+      const back = this.add.image(0, 0, 'token').setOrigin(0.5, 0.9).setScale(0.62).setTint(0x000000);
+      const tok = this.add.image(0, -1, 'token').setOrigin(0.5, 0.9).setScale(0.52).setTint(p.color);
+      c.add([back, tok]);
+      if (p.downed) c.setAlpha(0.45);
+      const num = addText(this, this.nodesLayer, 0, -40, String(p.id + 1), { size: 11, bold: true, align: 'center', color: '#ffffff' });
+      num.setStroke('#000000', 3);
+      this.nodesLayer.remove(num);
+      c.add(num);
+      this.nodesLayer.add(c);
+      const from = this.lastPos[p.id];
+      if (from !== undefined && from !== p.pos && !p.downed) {
+        const path = shortestPath(from, p.pos);
+        const pts = path.map((id) => (id === p.pos ? [tx, ty] : [mx(BOARD.nodes[id].x), my(BOARD.nodes[id].y) - 12]));
+        c.setPosition(pts[0][0], pts[0][1]);
+        this.tweens.chain({
+          targets: c,
+          tweens: pts.slice(1).map(([x, y]) => ({ x, y, duration: 140, ease: 'Sine.easeInOut' })),
+        });
+      }
     }
+    this.lastPos = s.players.map((p) => p.pos);
   }
 
   private nodeInfo(n: BoardNode): string {
@@ -288,16 +382,10 @@ export class GameScene extends Phaser.Scene {
   // ------------------------------------------------------------ side panel
 
   private drawMoonIcon(x: number, y: number, r: number, phase: ReturnType<typeof phaseForDay>): void {
-    const g = this.add.graphics();
-    g.fillStyle(0x1b1e3a, 1);
-    g.fillCircle(x, y, r);
-    g.fillStyle(0xf4f1d0, 1);
-    if (phase === 'full') g.fillCircle(x, y, r);
-    else if (phase === 'waxing') g.slice(x, y, r, Phaser.Math.DegToRad(-90), Phaser.Math.DegToRad(90), false).fillPath();
-    else if (phase === 'waning') g.slice(x, y, r, Phaser.Math.DegToRad(90), Phaser.Math.DegToRad(270), false).fillPath();
-    g.lineStyle(2, 0xf4f1d0, 1);
-    g.strokeCircle(x, y, r);
-    this.uiLayer.add(g);
+    const glow = this.add.image(x, y, 'glow').setTint(phase === 'full' ? 0xfff2c0 : 0x9fb4ff).setBlendMode(Phaser.BlendModes.ADD).setScale((r * 3.2) / 128);
+    this.pulse.push(glow);
+    const moon = this.add.image(x, y, `moon-${phase}`).setScale((r * 2) / 128);
+    this.uiLayer.add([glow, moon]);
   }
 
   private drawPanel(): void {
@@ -312,15 +400,15 @@ export class GameScene extends Phaser.Scene {
     addPanel(this, L, x0 - 6, 4, W - x0 + 2, H - 8);
     // day and moon
     this.drawMoonIcon(x0 + 34, 48, 26, phase);
-    addText(this, L, x0 + 76, 8, `DAY ${s.day} / ${CONFIG.dayCap}`, { size: 20, bold: true });
-    addText(this, L, x0 + 76, 32, PHASE_NAMES[phase].toUpperCase(), { size: 20, bold: true, color: phase === 'full' ? COL.gold : '#cfd3ff' });
+    addText(this, L, x0 + 76, 8, `DAY ${s.day} / ${CONFIG.dayCap}`, { size: 20, bold: true, serif: true });
+    addText(this, L, x0 + 76, 32, PHASE_NAMES[phase].toUpperCase(), { size: 20, bold: true, serif: true, color: phase === 'full' ? COL.gold : '#cfd3ff' });
     addText(this, L, x0 + 76, 56, open ? 'Sanctum is OPEN' : `Sanctum opens in ${daysUntilFull(s.day)} day(s)`, { size: 15, color: open ? COL.gold : COL.dim, bold: open });
     addText(this, L, x0 + 4, 82, moonEffect(s.day).text, { size: 12, color: COL.dim, wrap: 306 });
 
     // active knight
     const y0 = 112;
     this.uiLayer.add(this.add.circle(x0 + 12, y0 + 12, 10, k.color).setStrokeStyle(2, 0xffffff));
-    addText(this, L, x0 + 30, y0, `${k.name}${k.bot ? ' (bot)' : ''}${k.downed ? ' - fallen' : ''}`, { size: 20, bold: true, color: hex(k.color) });
+    addText(this, L, x0 + 30, y0, `${k.name}${k.bot ? ' (bot)' : ''}${k.downed ? ' - fallen' : ''}`, { size: 20, bold: true, serif: true, color: hex(k.color) });
     addBar(this, L, x0 + 4, y0 + 30, 306, 18, k.hp / e.maxHp, COL.hp, `HP ${k.hp} / ${e.maxHp}`);
     addText(this, L, x0 + 4, y0 + 54, `ATK ${e.attack}+${e.weaponBonus}   DEF ${e.defense}+${e.armorBonus}   STA ${e.maxStamina}`, { size: 15 });
     addText(this, L, x0 + 4, y0 + 74, `Gold ${k.gold}`, { size: 16, bold: true, color: COL.gold });
@@ -410,7 +498,7 @@ export class GameScene extends Phaser.Scene {
     switch (s.stage) {
       case 'roll':
         addText(this, L, bx, 442, `${k.name}'s move`, { size: 17, bold: true, color: hex(k.color) });
-        addButton(this, L, bx, 470, bw, 90, 'ROLL THE DIE', () => this.dispatch({ type: 'roll' }), { size: 26, fill: 0x5b3fd0 });
+        addButton(this, L, bx, 470, bw, 90, 'ROLL THE DIE', () => this.dispatch({ type: 'roll' }), { size: 26, fill: COL.primary });
         break;
       case 'move':
         addText(this, L, 561, 438, `Rolled ${s.moveRoll}`, { size: 34, bold: true, align: 'center', color: COL.gold });
@@ -477,7 +565,7 @@ export class GameScene extends Phaser.Scene {
     addPanel(this, M, 166, hy, 692, 44, 0x1c2042);
     addText(this, M, 176, hy + 12, q.hp > 0 ? `Healer: restore ${q.hp} HP for ${q.cost}g` : k.hp >= e.maxHp ? 'Healer: you are in full health' : 'Healer: you cannot afford any healing', { size: 16, bold: true });
     addButton(this, M, 760, hy + 4, 92, 36, 'Heal', () => this.dispatch({ type: 'heal' }), { size: 16, enabled: q.hp > 0, fill: 0x2f7a4a });
-    addButton(this, M, 166, hy + 56, 692, 50, 'Leave the village', () => this.dispatch({ type: 'leave' }), { size: 20, fill: 0x5b3fd0 });
+    addButton(this, M, 166, hy + 56, 692, 50, 'Leave the village', () => this.dispatch({ type: 'leave' }), { size: 20, fill: COL.primary });
   }
 
   private drawPvpLoot(): void {
@@ -508,7 +596,7 @@ export class GameScene extends Phaser.Scene {
     this.overlay(0.9);
     addPanel(this, M, 212, 70, 600, 440);
     addText(this, M, 512, 90, 'GAME OVER', { size: 20, align: 'center', color: COL.dim });
-    addText(this, M, 512, 118, `${w.name} wins!`, { size: 40, bold: true, align: 'center', color: hex(w.color) });
+    addText(this, M, 512, 118, `${w.name} wins!`, { size: 40, bold: true, serif: true, align: 'center', color: hex(w.color) });
     addText(this, M, 512, 170, s.endReason === 'sanctum' ? 'Slew the Hollow Warden and claimed the Sanctum.' : `Day ${CONFIG.dayCap} ended: most Seals (then gold) wins.`, { size: 17, align: 'center', wrap: 560 });
     const ranked = [...s.players].sort((a, b) => b.seals.length - a.seals.length || b.gold - a.gold);
     ranked.forEach((p, i) => {
@@ -519,7 +607,7 @@ export class GameScene extends Phaser.Scene {
       addText(this, M, 620, y + 2, `${p.gold}g`, { size: 17, color: COL.gold });
       addText(this, M, 700, y + 2, `${p.deaths} deaths`, { size: 17, color: COL.bad });
     });
-    addButton(this, M, 312, 400, 400, 60, 'Back to setup', () => this.onExit(), { size: 22, fill: 0x5b3fd0 });
+    addButton(this, M, 312, 400, 400, 60, 'Back to setup', () => this.onExit(), { size: 22, fill: COL.primary });
   }
 
   // ------------------------------------------------------------ combat
@@ -531,7 +619,7 @@ export class GameScene extends Phaser.Scene {
     M.add(r);
     addText(this, M, W / 2, 150, title, { size: 38, bold: true, align: 'center', color: hex(color) });
     addText(this, M, W / 2, 215, sub, { size: 20, align: 'center', wrap: 760, color: COL.dim });
-    addButton(this, M, W / 2 - 200, 330, 400, 90, label, onTap, { size: 26, fill: 0x5b3fd0 });
+    addButton(this, M, W / 2 - 200, 330, 400, 90, label, onTap, { size: 26, fill: COL.primary });
   }
 
   private fighterCard(x: number, side: 'a' | 'b', highlight: boolean): void {
@@ -638,7 +726,7 @@ export class GameScene extends Phaser.Scene {
       const winner = c.outcome === 'a' ? a.name : c.monster ? c.monster.name : b!.name;
       addText(this, M, 512, 250, `${winner} wins!`, { size: 32, bold: true, align: 'center', color: c.outcome === 'a' ? COL.good : COL.bad });
       const human = humanA || humanB;
-      if (human) addButton(this, M, 372, 320, 280, 70, 'Continue', () => this.dispatch({ type: 'continue' }), { size: 24, fill: 0x5b3fd0 });
+      if (human) addButton(this, M, 372, 320, 280, 70, 'Continue', () => this.dispatch({ type: 'continue' }), { size: 24, fill: COL.primary });
       else addText(this, M, 512, 330, 'Resolving...', { size: 18, align: 'center', color: COL.dim });
       return;
     }

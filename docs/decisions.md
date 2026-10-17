@@ -18,3 +18,7 @@ One line each: decision - reasoning.
 - M2: No input before impact = Guard ("hesitated") - Guard is always legal, so the round always resolves.
 - M2: Arena duels between two humans are simultaneous on one device (left A/S/D or left buttons, right J/K/L or right buttons); presses show only "READY" - hides choices without passing the device. Classic mode keeps the pass-and-reveal screens.
 - M2: Duel mode is a localStorage setting chosen on the setup screen (default Arena).
+- M3: All art is generated at boot (`src/ui/art/textures.ts`): seeded value-noise terrain with forests, ponds and dirt roads; tiling fog; radial glow; moon discs per phase with craters and terminator; node icons drawn with Graphics - no image files at all.
+- M3: Real Phaser Light2D on the map terrain (villages warm, homes in player colour, lairs red, Sanctum blue/gold) with ambient light following the moon phase; additive glow sprites duplicate the lights so Canvas renderers still look lit.
+- M3: Palette moved to dark fantasy (ink purples, bronze frames, parchment text, crimson primary) with serif headings from system fonts (Georgia/Palatino) - no web fonts to download.
+- M3: Blood particles respect a `blood` setting (sparks instead when off), echoing the original's optional gore toggle.

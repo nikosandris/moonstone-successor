@@ -32,3 +32,19 @@
 **Known issues**
 - Bot knights in duels do not telegraph (knight moves are secret by design).
 - Art is still flat placeholder shapes (M3).
+
+## M3 - Visual identity (done)
+
+**Changed**
+- Map: procedural moonlit moor (noise terrain, pine forests, ponds, rocks, worn dirt roads, vignette), two drifting fog layers, Light2D lights with flicker at villages/homes/lairs/Sanctum, ambient light by moon phase (dark New moon, silver Full moon), golden pulsing ring and light when the Sanctum opens.
+- Node icons: keep with banner in the owner's colour, village with lit windows, cave lair with red eyes and fangs, broken-column ruins, standing-stone Sanctum, waystones on roads. Knight tokens are silhouettes in player colour and walk along the roads when they move.
+- Panel moon: crater-textured disc per phase with a pulsing glow.
+- Arena: three backdrops (lair cave with flickering torches and embers, Sanctum standing stones with rising motes, moonlit field for duels showing the current moon), drifting ground fog, knight cape, particles for blood (or sparks with blood off), clash sparks and lunge dust. Scars drawn on the knight (eye patch for Lost Eye, slash marks for the rest).
+- Restyled panels, buttons and setup screen in a dark-fantasy palette.
+
+**Verification**
+- `npm test`: 102 pass. `npm run build`: 0 errors. Rules unchanged, so sim unchanged (Sanctum 76.9%, 24.5 days, max seat 27.1%).
+- Playwright screenshots inspected: map at New and Full moon (desktop + 800x360), lair, Sanctum and duel arenas. Full 4-bot arena game ran to the end. 0 console errors.
+
+**Known issues**
+- Fighters are flat vector silhouettes (no per-pixel lighting on them).
