@@ -1,6 +1,8 @@
 // Player preferences, kept in localStorage (UI only - never part of game state).
 export interface Settings {
-  duelMode: 'arena' | 'classic';
+  /** arena3d = Three.js real-time duel, arena = 2D Phaser duel, classic = buttons */
+  duelMode: 'arena3d' | 'arena' | 'classic';
+  v?: number;
   volume: number; // 0..1
   muted: boolean;
   animSpeed: number; // 0.5 slow .. 2 fast
@@ -9,14 +11,19 @@ export interface Settings {
 }
 
 const KEY = 'moonblood.settings';
-const DEFAULTS: Settings = { duelMode: 'arena', volume: 0.7, muted: false, animSpeed: 1, blood: true, tutorial: true };
+const DEFAULTS: Settings = { v: 2, duelMode: 'arena3d', volume: 0.7, muted: false, animSpeed: 1, blood: true, tutorial: true };
 
 let current: Settings = load();
 
 function load(): Settings {
   try {
     const raw = localStorage.getItem(KEY);
-    if (raw) return { ...DEFAULTS, ...JSON.parse(raw) };
+    if (raw) {
+      const saved = JSON.parse(raw) as Partial<Settings>;
+      // v1 saves predate the 3D arena: move them to the new default once
+      if (!saved.v) { saved.duelMode = 'arena3d'; saved.v = 2; }
+      return { ...DEFAULTS, ...saved };
+    }
   } catch {
     // storage blocked: fall back to defaults
   }

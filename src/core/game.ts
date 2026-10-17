@@ -565,6 +565,7 @@ function startCombat(
     maxStaminaA: ea.maxStamina,
     maxStaminaB,
     choiceA: null, choiceB: null, lastA: null, lastB: null, lastWinner: null,
+    perfectA: false, perfectB: false, lastPerfect: null,
     roundLog: [],
     over: false,
     outcome: null,
@@ -589,10 +590,17 @@ function playRound(s: GameState): void {
   const ka = s.players[c.a];
   const nameB = c.monster ? c.monster.name : s.players[c.b!].name;
   const res = resolveRound(a, b, ca, cb, rng);
+  // a perfectly timed read (arena) makes the winning blow land harder
+  const perfectSide = res.winner === 'a' && c.perfectA ? 'a' : res.winner === 'b' && c.perfectB ? 'b' : null;
+  if (perfectSide === 'a') res.dmgToB = Math.round(res.dmgToB * CONFIG.perfectMult);
+  if (perfectSide === 'b') res.dmgToA = Math.round(res.dmgToA * CONFIG.perfectMult);
+  c.lastPerfect = perfectSide;
+  c.perfectA = false;
+  c.perfectB = false;
 
   const lines: string[] = [`${ka.name}: ${CHOICE_LABEL[ca]}   ${nameB}: ${CHOICE_LABEL[cb]}`];
   if (res.winner === 'tie') lines.push('Same move - both trade blows.');
-  else lines.push(`${res.winner === 'a' ? ka.name : nameB} wins the exchange (double damage).`);
+  else lines.push(`${res.winner === 'a' ? ka.name : nameB} wins the exchange (${perfectSide ? 'PERFECT read: ' : ''}double damage${perfectSide ? ' x' + CONFIG.perfectMult : ''}).`);
   if (res.dmgToB > 0) lines.push(`${ka.name} deals ${res.dmgToB} to ${nameB} (d6=${res.rollA}).`);
   if (res.dmgToA > 0) lines.push(`${nameB} deals ${res.dmgToA} to ${ka.name} (d6=${res.rollB}).`);
 
@@ -924,11 +932,13 @@ export function applyAction(state: GameState, action: Action): GameState {
         need(c.choiceA === null, 'already chosen');
         need(isAllowed(a, action.choice), 'not enough stamina');
         c.choiceA = action.choice;
+        c.perfectA = !!action.perfect;
       } else {
         need(c.kind === 'pvp', 'side b is controlled by the game');
         need(c.choiceB === null, 'already chosen');
         need(isAllowed(b, action.choice), 'not enough stamina');
         c.choiceB = action.choice;
+        c.perfectB = !!action.perfect;
       }
       if (c.kind !== 'pvp' && c.choiceA) {
         c.choiceB = monsterChoose(

@@ -1,4 +1,13 @@
 import Phaser from 'phaser';
+import '@fontsource/cinzel/400.css';
+import '@fontsource/cinzel/700.css';
+import '@fontsource/cinzel/900.css';
+import '@fontsource/cinzel-decorative/700.css';
+import '@fontsource/cinzel-decorative/900.css';
+import '@fontsource/spectral/400.css';
+import '@fontsource/spectral/400-italic.css';
+import '@fontsource/spectral/600.css';
+import './ui/hud/hud.css';
 import { ArenaScene } from './ui/arena/ArenaScene';
 import { GameScene } from './ui/GameScene';
 import { audio } from './ui/audio';

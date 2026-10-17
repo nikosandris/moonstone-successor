@@ -95,7 +95,7 @@ export function showSetup(root: HTMLElement, onStart: (players: PlayerSetup[], s
     const modeLab = document.createElement('label');
     modeLab.textContent = 'Duels';
     modeRow.appendChild(modeLab);
-    for (const [mode, text] of [['arena', 'Arena (real-time)'], ['classic', 'Classic duel']] as const) {
+    for (const [mode, text] of [['arena3d', '3D Arena'], ['arena', '2D Arena'], ['classic', 'Classic']] as const) {
       const b = document.createElement('button');
       b.textContent = text;
       if (getSettings().duelMode === mode) b.className = 'sel';

@@ -6,27 +6,28 @@
     <title>Moonblood</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%23f4f1d0'/%3E%3Ccircle cx='22' cy='12' r='12' fill='%230b0d17'/%3E%3C/svg%3E" />
     <style>
-      html, body { margin: 0; height: 100%; background: #07070d; color: #ece4d4; font-family: system-ui, sans-serif; overflow: hidden; }
+      html, body { margin: 0; height: 100%; background: #07070d; color: #ece4d4; font-family: 'Spectral', Georgia, serif; overflow: hidden; }
       #game { position: fixed; inset: 0; }
       #setup { position: fixed; inset: 0; overflow: auto; display: flex; align-items: flex-start; justify-content: center; padding: 8px 0; box-sizing: border-box; background: radial-gradient(circle at 50% 25%, #2a2440, #07070d 70%); }
       #setup.hidden { display: none; }
-      .card { margin: auto; background: #15121f; border: 2px solid #6a5634; box-shadow: 0 0 60px rgba(0,0,0,0.7), inset 0 0 0 4px #15121f, inset 0 0 0 5px #2e2638; border-radius: 14px; padding: 18px 24px; max-width: 720px; width: 92%; }
-      h1 { margin: 0 0 4px; font-size: 38px; letter-spacing: 6px; color: #e8d6a8; font-family: Georgia, 'Palatino Linotype', serif; text-shadow: 0 0 18px rgba(255,200,120,0.35); }
+      .card { margin: auto; background: radial-gradient(120% 140% at 50% 0%, #241c2c, #120e18 55%, #0a080e); border: 2px solid #c9a45c; box-shadow: 0 0 60px rgba(0,0,0,0.7), inset 0 0 0 4px #15121f, inset 0 0 0 5px #2e2638; border-radius: 14px; padding: 18px 24px; max-width: 720px; width: 92%; }
+      h1 { margin: 0 0 4px; font-size: 44px; letter-spacing: 6px; font-family: 'Cinzel Decorative', 'Cinzel', Georgia, serif; font-weight: 900; color: transparent; background: linear-gradient(180deg, #fff6d8, #f0cf86 45%, #a87a2c 55%, #f6e1a6); -webkit-background-clip: text; background-clip: text; filter: drop-shadow(0 3px 0 #000) drop-shadow(0 0 18px rgba(255,200,120,0.25)); }
       .sub { margin: 0 0 14px; color: #a8a0bc; }
       .row { display: flex; gap: 8px; align-items: center; margin: 8px 0; flex-wrap: wrap; }
       .row label { min-width: 90px; }
       input[type=text] { flex: 1; min-width: 120px; font-size: 18px; padding: 10px; border-radius: 8px; border: 1px solid #5a4a30; background: #0c0a14; color: #ece4d4; }
-      button, select { font-size: 18px; padding: 10px 14px; border-radius: 8px; border: 1px solid #6a5634; background: #2a2238; color: #ece4d4; cursor: pointer; }
-      button.big { width: 100%; padding: 16px; font-size: 24px; background: #8c2f39; margin-top: 12px; font-family: Georgia, serif; letter-spacing: 2px; }
+      button, select { font: 700 15px/1.1 'Cinzel', Georgia, serif; letter-spacing: .08em; padding: 10px 14px; border-radius: 2px; border: 1px solid #6b5126; background: linear-gradient(180deg, #2c2438, #17121f); color: #efe3c8; cursor: pointer; box-shadow: inset 0 0 0 1px #000, 0 2px 6px #0008; }
+      button:hover { filter: brightness(1.25); }
+      button.big { width: 100%; padding: 16px; font-size: 22px; letter-spacing: .2em; text-transform: uppercase; background: linear-gradient(180deg, #a3303a, #7c1d22 55%, #3a0c10); border: 0; margin-top: 12px; clip-path: polygon(16px 0, calc(100% - 16px) 0, 100% 50%, calc(100% - 16px) 100%, 16px 100%, 0 50%); box-shadow: none; outline: 2px solid #c9a45c; outline-offset: -4px; }
       .swatch { width: 36px; height: 36px; border-radius: 50%; border: 3px solid transparent; padding: 0; }
       .swatch.sel { border-color: #fff; }
       .count button.sel { background: #8c2f39; border-color: #c9a96a; }
       .overlay { position: fixed; inset: 0; z-index: 50; background: rgba(4,3,8,0.78); display: flex; align-items: center; justify-content: center; }
       .sheet { background: #15121f; border: 2px solid #6a5634; border-radius: 14px; width: min(760px, 94vw); max-height: 92vh; display: flex; flex-direction: column; box-shadow: 0 0 60px rgba(0,0,0,0.8); }
       .sheet-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 18px; border-bottom: 1px solid #2e2638; }
-      .sheet-head h2 { margin: 0; font-family: Georgia, serif; color: #e8d6a8; letter-spacing: 2px; }
+      .sheet-head h2 { margin: 0; font-family: 'Cinzel', Georgia, serif; color: #f6e1a6; letter-spacing: .14em; text-transform: uppercase; }
       .sheet-body { overflow-y: auto; padding: 8px 20px 18px; line-height: 1.5; font-size: 17px; }
-      .sheet-body h3 { font-family: Georgia, serif; color: #ffd36a; margin: 14px 0 4px; }
+      .sheet-body h3 { font-family: 'Cinzel', Georgia, serif; color: #f6e1a6; letter-spacing: .1em; margin: 14px 0 4px; }
       .sheet-body ul { margin: 4px 0; padding-left: 22px; }
       .count button.sel { background: #8c2f39; border-color: #c9a96a; }
       .resume { background: #2f5a3a !important; }

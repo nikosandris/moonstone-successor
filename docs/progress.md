@@ -109,3 +109,22 @@
 
 **Known issues**
 - Frame-rate on real phones and GPUs, and the actual sound, could not be checked from the headless test environment.
+
+## N1 - 3D combat prototype + UI overhaul (done)
+
+**Changed**
+- 3D arena (three.js): CC0 KayKit knight (cape in player colour) vs re-armed/re-coloured KayKit monsters; three stages (moonlit forest, lair cave, Sanctum stone ring) with shadows, moonlight by phase, torches with flicker and embers, fog, bloom, vignette.
+- Telegraphs from real animation clips: Strike and Feint share the first half of the wind-up, then a red blade glow (Strike) or gold flicker (Feint); Guard raises the shield with a blue glow.
+- Timing: a crescent timing arc; pressing in its gold end is a "perfect read" (x1.5 damage when you win the exchange). Hit stop, camera punch, blood particles and pools, sparks, slow-motion death with camera orbit.
+- New HUD design system: medallion portraits, gilded health bars with damage ghost, rune stamina pips, crest-shaped action sigils with icons, gold-gradient banners and damage numbers.
+- The whole map interface (side panel, chronicle, action bar, shop, events, level-up, duel spoils, end summary, tutorial) rebuilt in the same style as HTML/CSS overlays; setup screen and menus restyled.
+- Asset pipeline `npm run assets` (download + optimise, ~2 MB total), `CREDITS.md`.
+
+**Verification**
+- `npm test`: 121 pass (new: perfect-read damage). `npm run build`: 0 errors.
+- `npm run sim`: Sanctum 85.8%, average 20.6 days, seats 23.3 / 23.4 / 25.8 / 27.5%.
+- Playwright (desktop 1280x720 + 800x360 touch): 3D lair fight played with keyboard to victory and seal claimed; touch FIGHT and action sigils; map panel, roll, shop purchase, event, level-up, end summary, tutorial; Seals row measured free of overlaps; Classic-mode bot game still runs. 0 console errors. Screenshots inspected.
+
+**Known issues**
+- Characters are stylised low-poly (no realistic CC0 animated characters are reachable from this environment).
+- Headless tests render WebGL in software at low FPS; real-device frame rate not measured.

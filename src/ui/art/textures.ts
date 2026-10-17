@@ -174,7 +174,7 @@ function drawTerrain(scale: number): HTMLCanvasElement {
   return canvas;
 }
 
-function drawFog(): HTMLCanvasElement {
+export function drawFog(): HTMLCanvasElement {
   const S = 256;
   const [c, ctx] = makeCanvas(S, S);
   const img = ctx.createImageData(S, S);
@@ -207,7 +207,7 @@ function drawGlow(size: number): HTMLCanvasElement {
 // ------------------------------------------------------------------ moon
 
 /** Moon disc with craters and a soft terminator for the phase. */
-function drawMoon(phase: MoonPhase, size: number): HTMLCanvasElement {
+export function drawMoon(phase: MoonPhase, size: number): HTMLCanvasElement {
   const [c, ctx] = makeCanvas(size, size);
   const r = size / 2 - 2;
   const cx = size / 2;

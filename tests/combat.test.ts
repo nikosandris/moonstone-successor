@@ -158,3 +158,25 @@ describe('monster move preview (arena telegraphs)', () => {
     }
   });
 });
+
+describe('perfect timing (arena)', () => {
+  it('a winning perfect choice deals perfectMult times the damage; a losing one changes nothing', () => {
+    // same seed twice: once normal, once perfect - the RNG draws are identical
+    const setup = () => edit(act(atNode(newGame(2, 4), 5), { type: 'move', to: 5 }), (d) => { d.players[0].baseMaxHp = 999; d.players[0].hp = 999; });
+    for (let tries = 0; tries < 30; tries++) {
+      const base = setup();
+      const s0 = edit(base, (d) => { d.rng = (d.rng + tries * 7919) >>> 0; });
+      const normal = applyAction(s0, { type: 'choose', side: 'a', choice: 'guard' }); // the wolf always opens with Strike
+      const perfect = applyAction(s0, { type: 'choose', side: 'a', choice: 'guard', perfect: true });
+      const dn = s0.combat!.monster!.hp - normal.combat!.monster!.hp;
+      const dp = s0.combat!.monster!.hp - perfect.combat!.monster!.hp;
+      if (normal.combat!.lastWinner === 'a' && !normal.combat!.over && !perfect.combat!.over) {
+        expect(dp).toBe(Math.round(dn * CONFIG.perfectMult));
+        expect(perfect.combat!.lastPerfect).toBe('a');
+        return;
+      }
+      if (normal.combat!.lastWinner === 'b') expect(dp).toBe(dn);
+    }
+    throw new Error('no winning exchange found');
+  });
+});

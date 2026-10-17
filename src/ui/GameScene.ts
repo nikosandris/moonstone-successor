@@ -2,25 +2,25 @@ import Phaser from 'phaser';
 import { botAction } from '../core/bot';
 import { allowedChoices, choiceCost } from '../core/combat';
 import {
-  actorId, applyAction, buyCheck, canFlee, combatFighters, combatHp, createGame, fleeCost, healQuote,
-  affinityText, eventOptionBlock, nextKnightId, stealableSeals,
+  actorId, affinityText, applyAction, canFlee, combatFighters, combatHp, createGame, fleeCost,
 } from '../core/game';
 import { reachable, shortestPath } from '../core/graph';
-import { daysUntilFull, isSanctumOpen, moonEffect, phaseForDay } from '../core/moon';
-import { effectiveStats, shopPrice } from '../core/stats';
+import { isSanctumOpen, moonEffect, phaseForDay } from '../core/moon';
 import type { Action, BoardNode, Choice, GameState, Knight, PlayerSetup } from '../core/types';
 import { CONFIG, PHASE_NAMES } from '../data/balance';
 import { BOARD } from '../data/board';
 import { getItem } from '../data/items';
 import { getMonster } from '../data/monsters';
 import { getScar } from '../data/scars';
-import { LEVEL_THRESHOLDS, getBoon } from '../data/boons';
 import {
   COL, H, NODE_LABEL, SEAL_COLORS, SERIF, W, hex,
 } from './theme';
 import { generateTextures } from './art/textures';
 import { audio } from './audio';
+import { Arena3D } from './arena3d/Arena3D';
+import { is3dReady, preload3d, webgl2Available } from './arena3d/assets3d';
 import { showSettings } from './overlays';
+import { MapHud, type TutorialStep } from './hud/MapHud';
 import { saveGame } from './save';
 import { getSettings, onSettings, updateSettings } from './settings';
 import { addBar, addButton, addPanel, addText } from './widgets';
@@ -40,10 +40,6 @@ const mx = (x: number) => MAP_X + x * MAP_SCALE;
 const my = (y: number) => MAP_Y + y * MAP_SCALE;
 
 const PANEL_X = 700;
-
-const SHORT_ITEM: Record<string, string> = {
-  potionS: 'Heal +12', potionL: 'Heal +28', whetstone: 'Whetstone', tonic: 'Iron Tonic', brew: 'Vigor Brew', boots: 'Boots +3', smoke: 'Smoke Bomb',
-};
 
 const CHOICE_INFO: Record<Choice, { label: string; beats: string }> = {
   strike: { label: 'Strike', beats: 'beats Feint' },
@@ -72,7 +68,7 @@ export class GameScene extends Phaser.Scene {
   private lastPos: number[] = [];
   private justRolled = false;
   private tutStep = -1;
-  private tutLayer: Phaser.GameObjects.Container | null = null;
+  private hud!: MapHud;
 
   // hot-seat duel flow (choices stay in memory until the reveal)
   private duelKey = '';
@@ -99,7 +95,7 @@ export class GameScene extends Phaser.Scene {
     this.nodesLayer = this.add.container(0, 0);
     this.uiLayer = this.add.container(0, 0);
     this.modalLayer = this.add.container(0, 0).setDepth(100);
-    this.infoText = this.add.text(10, 2, '', { fontFamily: 'system-ui, sans-serif', fontSize: '14px', color: COL.dim, resolution: 2 });
+    this.infoText = this.add.text(10, 2, '', { fontFamily: 'Spectral, Georgia, serif', fontStyle: 'italic', fontSize: '14px', color: '#c9bfae', resolution: 2 });
     this.toastText = this.add
       .text(W / 2, H - 18, '', {
         fontFamily: 'system-ui, sans-serif', fontSize: '18px', color: '#ffffff', backgroundColor: '#8a2b2b', padding: { x: 10, y: 4 }, resolution: 2,
@@ -110,6 +106,10 @@ export class GameScene extends Phaser.Scene {
     // ?speed=N shortens bot delays (used for automated checks)
     this.applySpeed();
     onSettings(() => this.applySpeed());
+    // load the 3D arena models in the background; fights use the 2D arena until they are ready
+    if (webgl2Available()) preload3d().catch((e) => console.warn('3D assets failed to load, using the 2D arena', e));
+    this.events.once('shutdown', () => Arena3D.closeCurrent());
+    this.events.once('destroy', () => Arena3D.closeCurrent());
     // keyboard: Space/Enter rolls the die or ends the turn
     this.input.keyboard?.on('keydown', (e: KeyboardEvent) => {
       if (e.key !== ' ' && e.key !== 'Enter') return;
@@ -119,6 +119,17 @@ export class GameScene extends Phaser.Scene {
       else if (s.stage === 'turnEnd') this.dispatch({ type: 'endTurn' });
     });
     this.lastPos = this.state.players.map((p) => p.pos);
+    this.hud = new MapHud({
+      canvas: () => this.game.canvas,
+      dispatch: (a) => this.dispatch(a),
+      onMenu: () => showSettings({ inGame: true, onQuit: () => this.onExit(), onChange: () => this.render() }),
+      onToggleSound: () => { updateSettings({ muted: !getSettings().muted }); this.render(); },
+      onExit: () => this.onExit(),
+      onTutorial: (step) => { this.tutStep = step; this.render(); },
+    });
+    this.events.once('shutdown', () => this.hud.destroy());
+    this.events.once('destroy', () => this.hud.destroy());
+    this.scale.on('resize', () => this.hud.layout());
     this.render();
   }
 
@@ -228,38 +239,45 @@ export class GameScene extends Phaser.Scene {
     this.infoText.setText(this.infoNode !== null ? this.nodeInfo(BOARD.nodes[this.infoNode]) : 'Tap any node for details.');
 
     this.drawNodes();
-    this.drawPanel();
-    this.drawBottom();
     const s = this.state;
-    const arena = s.stage === 'combat' && getSettings().duelMode === 'arena';
+    const arena = s.stage === 'combat' && this.realtimeMode() !== 'classic';
     this.syncArena(arena);
-    if (s.stage === 'shop') this.drawShop();
-    else if (s.stage === 'combat' && !arena) this.drawCombat();
-    else if (s.stage === 'pvpLoot') this.drawPvpLoot();
-    else if (s.stage === 'event') this.drawEvent();
-    else if (s.stage === 'levelUp') this.drawLevelUp();
-    else if (s.stage === 'gameOver') this.drawGameOver();
-    this.drawTutorial();
+    if (s.stage === 'combat' && !arena) this.drawCombat();
+    const tut = this.tutorialStep();
+    this.hud.render(s, { justRolled: this.justRolled, tutorial: tut ? tut.step : null, tutIndex: this.tutStep, tutTotal: tut ? tut.total : 0, actorBot: this.actor.bot });
+    this.justRolled = false;
     this.scheduleBot();
   }
 
   // ------------------------------------------------------------ bots
 
   /** The arena is a separate scene layered on top; it drives fights (including bot moves) itself. */
+  /** Which duel presentation applies right now; the 3D arena falls back to 2D until its models are loaded. */
+  private realtimeMode(): 'arena3d' | 'arena' | 'classic' {
+    const m = getSettings().duelMode;
+    if (m === 'arena3d' && (!webgl2Available() || !is3dReady())) return 'arena';
+    return m;
+  }
+
   private syncArena(on: boolean): void {
-    const active = this.scene.isActive('Arena') || this.scene.isPaused('Arena');
-    if (on && !active) {
-      this.scene.launch('Arena', { host: { getState: () => this.state, dispatch: (a: Action) => this.dispatch(a) } });
+    const mode = this.realtimeMode();
+    const host = { getState: () => this.state, dispatch: (a: Action) => this.dispatch(a), canvas: () => this.game.canvas };
+    const active2d = this.scene.isActive('Arena') || this.scene.isPaused('Arena');
+    if (on && mode === 'arena3d') {
+      if (!Arena3D.isOpen()) Arena3D.open(host);
+    } else if (Arena3D.isOpen()) Arena3D.closeCurrent();
+    if (on && mode === 'arena' && !active2d) {
+      this.scene.launch('Arena', { host });
       this.scene.bringToTop('Arena');
     }
-    if (!on && active) this.scene.stop('Arena');
+    if ((!on || mode !== 'arena') && active2d) this.scene.stop('Arena');
     this.input.enabled = !on;
   }
 
   private scheduleBot(): void {
     const s = this.state;
     if (s.stage === 'gameOver') return;
-    if (s.stage === 'combat' && getSettings().duelMode === 'arena') return;
+    if (s.stage === 'combat' && this.realtimeMode() !== 'classic') return;
     let action: Action | null = null;
     let delay = 650;
     const c = s.combat;
@@ -324,7 +342,7 @@ export class GameScene extends Phaser.Scene {
     }
     frame.lineStyle(3, 0x2a2f55, 1);
     const border = this.add.graphics();
-    border.lineStyle(3, 0x3a3060, 1);
+    border.lineStyle(3, 0x6b5126, 1);
     border.strokeRoundedRect(4, 18, 686, 412, 10);
   }
 
@@ -467,216 +485,23 @@ export class GameScene extends Phaser.Scene {
 
   // ------------------------------------------------------------ side panel
 
-  private drawMoonIcon(x: number, y: number, r: number, phase: ReturnType<typeof phaseForDay>): void {
-    const glow = this.add.image(x, y, 'glow').setTint(phase === 'full' ? 0xfff2c0 : 0x9fb4ff).setBlendMode(Phaser.BlendModes.ADD).setScale((r * 3.2) / 128);
-    this.pulse.push(glow);
-    const moon = this.add.image(x, y, `moon-${phase}`).setScale((r * 2) / 128);
-    this.uiLayer.add([glow, moon]);
-  }
-
-  private drawPanel(): void {
-    const s = this.state;
-    const L = this.uiLayer;
-    const k = s.players[s.current];
-    const e = effectiveStats(k);
-    const phase = phaseForDay(s.day);
-    const open = isSanctumOpen(s.day);
-    const x0 = PANEL_X;
-
-    addPanel(this, L, x0 - 6, 4, W - x0 + 2, H - 8);
-    // day and moon
-    this.drawMoonIcon(x0 + 34, 48, 26, phase);
-    addText(this, L, x0 + 76, 8, `DAY ${s.day} / ${CONFIG.dayCap}`, { size: 20, bold: true, serif: true });
-    addText(this, L, x0 + 76, 32, PHASE_NAMES[phase].toUpperCase(), { size: 20, bold: true, serif: true, color: phase === 'full' ? COL.gold : '#cfd3ff' });
-    addText(this, L, x0 + 76, 56, open ? 'Sanctum is OPEN' : `Sanctum opens in ${daysUntilFull(s.day)} day(s)`, { size: 15, color: open ? COL.gold : COL.dim, bold: open });
-    addText(this, L, x0 + 4, 82, moonEffect(s.day).text, { size: 12, color: COL.dim, wrap: 306 });
-    const muted = getSettings().muted;
-    addButton(this, L, W - 118, 4, 52, 26, 'Menu', () => {
-      showSettings({ inGame: true, onQuit: () => this.onExit(), onChange: () => this.render() });
-    }, { size: 11, fill: 0x2a2238 });
-    addButton(this, L, W - 62, 4, 52, 26, muted ? 'Muted' : 'Sound', () => {
-      updateSettings({ muted: !getSettings().muted });
-      this.render();
-    }, { size: 11, fill: muted ? 0x3a2a2a : 0x2a3a2a });
-
-    // active knight
-    const y0 = 112;
-    this.uiLayer.add(this.add.circle(x0 + 12, y0 + 12, 10, k.color).setStrokeStyle(2, 0xffffff));
-    addText(this, L, x0 + 30, y0, `${k.name}${k.bot ? ' (bot)' : ''}${k.downed ? ' - fallen' : ''}`, { size: 20, bold: true, serif: true, color: hex(k.color) });
-    addBar(this, L, x0 + 4, y0 + 30, 306, 18, k.hp / e.maxHp, COL.hp, `HP ${k.hp} / ${e.maxHp}`);
-    addText(this, L, x0 + 4, y0 + 54, `ATK ${e.attack}+${e.weaponBonus}   DEF ${e.defense}+${e.armorBonus}   STA ${e.maxStamina}`, { size: 15 });
-    addText(this, L, x0 + 4, y0 + 74, `Gold ${k.gold}`, { size: 16, bold: true, color: COL.gold });
-    const wep = k.weapon ? getItem(k.weapon) : null;
-    const arm = k.armor ? getItem(k.armor) : null;
-    addText(this, L, x0 + 90, y0 + 74, `Seals ${k.seals.length}/4  Deaths ${k.deaths}`, { size: 14, color: COL.dim });
-    addText(this, L, x0 + 4, y0 + 96, `Weapon: ${wep ? `${wep.name} (${wep.desc})` : 'none'}`, { size: 14 });
-    addText(this, L, x0 + 4, y0 + 114, `Armor:  ${arm ? `${arm.name} (${arm.desc})` : 'none'}`, { size: 14 });
-
-    // consumables (short labels so they stay one line at the 12 px minimum)
-    const cy = y0 + 136;
-    const canUse = s.stage === 'roll' && !k.bot;
-    for (let i = 0; i < 3; i++) {
-      const id = k.consumables[i];
-      if (id) {
-        addButton(this, L, x0 + 4 + i * 104, cy, 100, 34, SHORT_ITEM[id] ?? getItem(id).name, () => this.dispatch({ type: 'useItem', slot: i }), { size: 13, enabled: canUse, fill: 0x2e4a7a });
-      } else {
-        addPanel(this, L, x0 + 4 + i * 104, cy, 100, 34, 0x0f1226);
-        addText(this, L, x0 + 54 + i * 104, cy + 9, 'empty', { size: 12, color: '#8a86a0', align: 'center' });
-      }
-    }
-
-    // seals
-    const sy = cy + 44;
-    addText(this, L, x0 + 4, sy + 2, `Seals (need ${CONFIG.sealsToEnter}):`, { size: 13, bold: true });
-    for (let i = 0; i < 4; i++) {
-      const held = k.seals.includes(i);
-      const d = this.add.polygon(x0 + 150 + i * 40, sy + 10, [0, -11, 10, 0, 0, 11, -10, 0], held ? SEAL_COLORS[i] : 0x0b0d17).setStrokeStyle(2, SEAL_COLORS[i]);
-      this.uiLayer.add(d);
-    }
-
-    // scars
-    const scy = sy + 28;
-    addText(this, L, x0 + 4, scy, k.scars.length ? 'Scars:' : 'Scars: none', { size: 13, bold: true, color: k.scars.length ? COL.text : COL.dim });
-    k.scars.slice(0, 3).forEach((id, i) => {
-      const sc = getScar(id);
-      addText(this, L, x0 + 4, scy + 17 + i * 15, `${sc.name}: ${sc.desc}`, { size: 12, color: COL.bad });
-    });
-    if (k.scars.length > 3) addText(this, L, x0 + 210, scy, `(+${k.scars.length - 3} more)`, { size: 12, color: COL.bad });
-    // renown and boons
-    const by = scy + 17 + Math.min(3, k.scars.length) * 15 + 4;
-    const nextAt = LEVEL_THRESHOLDS[k.boons.length + k.pendingBoons];
-    addText(this, L, x0 + 4, by, `Renown ${k.renown}${nextAt ? ` (level-up at ${nextAt})` : ''}${k.boons.length ? ': ' + k.boons.map((id) => getBoon(id).name).join(', ') : ''}`, { size: 12, bold: true, color: '#ffd36a', wrap: 306 });
-
-    // all knights
-    const ky = H - 4 - 8 - s.players.length * 20 - 20;
-    addText(this, L, x0 + 4, ky, "Today's initiative", { size: 13, bold: true, color: COL.dim });
-    s.order.map((id) => s.players[id]).forEach((p, i) => {
-      const yy = ky + 18 + i * 20;
-      const done = i < s.step;
-      this.uiLayer.add(this.add.circle(x0 + 12, yy + 8, 6, p.color, done ? 0.4 : 1).setStrokeStyle(p.id === s.current ? 2 : 0, 0xffffff));
-      addText(this, L, x0 + 24, yy, `${i + 1}. ${p.name}`, { size: 13, bold: p.id === s.current, color: done ? COL.dim : COL.text });
-      addText(this, L, x0 + 150, yy, `HP ${p.hp}`, { size: 13, color: p.hp < 10 ? COL.bad : COL.text });
-      addText(this, L, x0 + 214, yy, `${p.seals.length}◆`, { size: 13 });
-      addText(this, L, x0 + 250, yy, `${p.gold}g`, { size: 13, color: COL.gold });
-      if (p.scars.length) addText(this, L, x0 + 296, yy, `⚔${p.scars.length}`, { size: 12, color: COL.bad });
-    });
-  }
-
   // ------------------------------------------------------------ bottom bar (log + actions)
-
-  private drawBottom(): void {
-    const s = this.state;
-    const L = this.uiLayer;
-    addPanel(this, L, 4, 436, 424, 136);
-    // newest message at the bottom; older ones stack upward until the panel is full
-    let yb = 568;
-    for (let i = s.log.length - 1; i >= 0; i--) {
-      const e = s.log[i];
-      const txt = addText(this, L, 10, 0, `D${e.day} ${e.text}`, { size: 13, color: i === s.log.length - 1 ? '#ffffff' : '#a9aed8', wrap: 410 });
-      yb -= txt.height + 2;
-      if (yb < 440) { txt.destroy(); break; }
-      txt.setY(yb);
-    }
-
-    addPanel(this, L, 432, 436, 258, 136);
-    const k = s.players[s.current];
-    const bx = 442;
-    const bw = 238;
-    if (s.stage === 'gameOver') return;
-    const me = this.actor;
-    if (me.bot) {
-      addText(this, L, 561, 480, `${me.name} (bot) is thinking...`, { size: 17, align: 'center', color: COL.dim });
-      return;
-    }
-    switch (s.stage) {
-      case 'roll':
-        addText(this, L, bx, 442, `${k.name}'s move`, { size: 17, bold: true, color: hex(k.color) });
-        addButton(this, L, bx, 470, bw, 90, 'ROLL THE DIE', () => this.dispatch({ type: 'roll' }), { size: 26, fill: COL.primary, sub: 'Space / Enter' });
-        break;
-      case 'move': {
-        const rolled = addText(this, L, 600, 438, `Rolled ${s.moveRoll}`, { size: 34, bold: true, align: 'center', color: COL.gold });
-        const die = this.drawDie(505, 462, s.moveRoll);
-        if (this.justRolled) {
-          this.justRolled = false;
-          rolled.setAlpha(0);
-          let n = 0;
-          this.time.addEvent({
-            delay: 55, repeat: 8, callback: () => {
-              n++;
-              die.setData('face', n < 9 ? 1 + Math.floor(Math.random() * 6) : s.moveRoll);
-              this.paintDie(die, n < 9 ? (die.getData('face') as number) : s.moveRoll);
-              die.setAngle(n < 9 ? (Math.random() - 0.5) * 50 : 0);
-              if (n >= 9) rolled.setAlpha(1);
-            },
-          });
-        }
-        addText(this, L, 561, 494, `Tap a glowing node (up to ${s.moveRoll} steps). Tap your own node to stay.`, { size: 14, align: 'center', wrap: bw });
-        break;
-      }
-      case 'pvpOffer': {
-        addText(this, L, bx, 440, 'A rival stands here!', { size: 16, bold: true });
-        let yy = 464;
-        for (const id of s.challengeable) {
-          const o = s.players[id];
-          addButton(this, L, bx, yy, bw, 42, `Challenge ${o.name}`, () => this.dispatch({ type: 'challenge', target: id }), { size: 16, fill: 0x8a2b2b });
-          yy += 46;
-        }
-        addButton(this, L, bx, yy, bw, 36, 'Leave in peace', () => this.dispatch({ type: 'leave' }), { size: 15 });
-        break;
-      }
-      case 'turnEnd': {
-        const nextId = nextKnightId(s);
-        const next = nextId !== null ? s.players[nextId] : null;
-        const lastOfDay = next === null;
-        addText(this, L, 561, 446, 'Turn complete.', { size: 16, align: 'center', color: COL.dim });
-        addButton(this, L, bx, 472, bw, 80, 'END TURN', () => this.dispatch({ type: 'endTurn' }), {
-          size: 24, fill: 0x2f7a4a, sub: lastOfDay ? 'A new day dawns (Space)' : `Pass to ${next!.name} (Space)`,
-        });
-        break;
-      }
-      default:
-        addText(this, L, 561, 490, 'Resolve the encounter...', { size: 16, align: 'center', color: COL.dim });
-    }
-  }
-
-  private drawDie(x: number, y: number, face: number): Phaser.GameObjects.Graphics {
-    const g = this.add.graphics({ x, y });
-    this.uiLayer.add(g);
-    this.paintDie(g, face);
-    return g;
-  }
-
-  private paintDie(g: Phaser.GameObjects.Graphics, face: number): void {
-    g.clear();
-    g.fillStyle(0xe8e0cc, 1);
-    g.fillRoundedRect(-22, -22, 44, 44, 8);
-    g.lineStyle(2, 0x6a5634, 1);
-    g.strokeRoundedRect(-22, -22, 44, 44, 8);
-    g.fillStyle(0x8c2f39, 1);
-    const P: Record<number, [number, number][]> = {
-      1: [[0, 0]], 2: [[-10, -10], [10, 10]], 3: [[-10, -10], [0, 0], [10, 10]],
-      4: [[-10, -10], [10, -10], [-10, 10], [10, 10]], 5: [[-10, -10], [10, -10], [0, 0], [-10, 10], [10, 10]],
-      6: [[-10, -11], [10, -11], [-10, 0], [10, 0], [-10, 11], [10, 11]],
-    };
-    for (const [px, py] of P[Math.max(1, Math.min(6, face))] ?? []) g.fillCircle(px, py, 4.5);
-  }
 
   // ------------------------------------------------------------ tutorial
 
   /** First-turn coach marks. Some steps wait for the player to act (roll, move). */
-  private drawTutorial(): void {
-    this.tutLayer?.destroy();
-    this.tutLayer = null;
+  /** First-turn coach marks. Some steps wait for the player to act (roll, move). */
+  private tutorialStep(): { step: TutorialStep; total: number } | null {
     const s = this.state;
-    if (this.tutStep < 0 || s.stage === 'gameOver') return;
+    if (this.tutStep < 0 || s.stage === 'gameOver') return null;
     const me = s.players[s.current];
-    if (me.bot) return;
+    if (me.bot) return null;
     // steps that wait for an action advance by themselves
     if (this.tutStep === 3 && s.stage !== 'roll') this.tutStep = 4;
     if (this.tutStep === 4 && s.stage !== 'move' && s.stage !== 'roll') this.tutStep = 5;
-    if (s.stage === 'combat' && getSettings().duelMode === 'arena') return;
+    if (s.stage === 'combat' && this.realtimeMode() !== 'classic') return null;
     const home = BOARD.nodes[me.pos];
-    const steps: { rect: [number, number, number, number]; text: string; wait?: boolean }[] = [
+    const steps: TutorialStep[] = [
       { rect: [mx(home.x) - 40, my(home.y) - 60, 80, 90], text: `Welcome, ${me.name}! This is your knight, standing at your Home. Home heals you fully whenever you stop there.` },
       { rect: [PANEL_X - 6, 4, W - PANEL_X + 2, 104], text: 'The moon rules the hunt. Monsters are weak at New moon and strong at Full moon - and the Sanctum in the centre opens ONLY under the Full moon (days 9-12 and 25-28).' },
       { rect: [PANEL_X - 6, 108, W - PANEL_X + 2, 300], text: 'Your knight: health, Attack and Defense, gold, gear, items, the four Seals and any scars. You need 3 Seals to face the Sanctum guardian.' },
@@ -687,37 +512,9 @@ export class GameScene extends Phaser.Scene {
     if (this.tutStep >= steps.length) {
       this.tutStep = -1;
       updateSettings({ tutorial: false });
-      return;
+      return null;
     }
-    const st = steps[this.tutStep];
-    const c = this.add.container(0, 0).setDepth(140);
-    const [rx, ry, rw, rh] = st.rect;
-    const shade = 0x000000;
-    const a = 0.55;
-    c.add([
-      this.add.rectangle(0, 0, W, ry, shade, a).setOrigin(0, 0),
-      this.add.rectangle(0, ry + rh, W, H - ry - rh, shade, a).setOrigin(0, 0),
-      this.add.rectangle(0, ry, rx, rh, shade, a).setOrigin(0, 0),
-      this.add.rectangle(rx + rw, ry, W - rx - rw, rh, shade, a).setOrigin(0, 0),
-    ]);
-    const frame = this.add.rectangle(rx, ry, rw, rh).setOrigin(0, 0).setStrokeStyle(3, 0xffd36a);
-    c.add(frame);
-    this.tweens.add({ targets: frame, alpha: { from: 1, to: 0.35 }, duration: 600, yoyo: true, repeat: -1 });
-    // text box placed away from the highlight
-    const boxW = 420;
-    const boxH = 132;
-    let bx = rx + rw + 16;
-    if (bx + boxW > W - 8) bx = rx - boxW - 16;
-    if (bx < 8) bx = (W - boxW) / 2;
-    let byy = Math.min(Math.max(8, ry), H - boxH - 8);
-    if (bx === (W - boxW) / 2) byy = ry > H / 2 ? ry - boxH - 12 : Math.min(H - boxH - 8, ry + rh + 12);
-    const box = this.add.rectangle(bx, byy, boxW, boxH, 0x15121f, 0.97).setOrigin(0, 0).setStrokeStyle(2, 0xc9a96a);
-    c.add(box);
-    addText(this, c, bx + 14, byy + 10, `Tutorial ${this.tutStep + 1}/${steps.length}`, { size: 12, bold: true, color: '#ffd36a' });
-    addText(this, c, bx + 14, byy + 28, st.text, { size: 14, wrap: boxW - 28 });
-    if (!st.wait) addButton(this, c, bx + boxW - 104, byy + boxH - 40, 92, 32, this.tutStep === steps.length - 1 ? 'Done' : 'Next', () => { this.tutStep++; this.render(); }, { size: 15, fill: COL.primary });
-    addButton(this, c, bx + boxW - 196, byy + boxH - 40, 84, 32, 'Skip', () => { this.tutStep = steps.length; this.render(); }, { size: 13, fill: 0x3a3446 });
-    this.tutLayer = c;
+    return { step: steps[this.tutStep], total: steps.length };
   }
 
   // ------------------------------------------------------------ modals
@@ -725,137 +522,6 @@ export class GameScene extends Phaser.Scene {
   private overlay(alpha = 0.88): void {
     const r = this.add.rectangle(0, 0, W, H, 0x05060d, alpha).setOrigin(0, 0).setInteractive();
     this.modalLayer.add(r);
-  }
-
-  private drawShop(): void {
-    const s = this.state;
-    const k = s.players[s.current];
-    if (k.bot) return;
-    const M = this.modalLayer;
-    const nd = BOARD.nodes[k.pos];
-    this.overlay(0.8);
-    addPanel(this, M, 150, 18, 724, 540);
-    addText(this, M, 170, 28, `${nd.name} - Village shop`, { size: 24, bold: true });
-    addText(this, M, 854, 32, `Gold: ${k.gold}`, { size: 20, bold: true, color: COL.gold, align: 'right' });
-    const e = effectiveStats(k);
-    addText(this, M, 170, 62, `HP ${k.hp}/${e.maxHp}   Weapon: ${k.weapon ? getItem(k.weapon).name : '-'}   Armor: ${k.armor ? getItem(k.armor).name : '-'}   Pack ${k.consumables.length}/3`, { size: 14, color: COL.dim });
-    (nd.stock ?? []).forEach((id, i) => {
-      const it = getItem(id);
-      const y = 90 + i * 50;
-      const why = buyCheck(k, id);
-      addPanel(this, M, 166, y, 692, 44, 0x1c2042);
-      addText(this, M, 176, y + 4, `${it.name}  (T${it.tier})`, { size: 17, bold: true });
-      addText(this, M, 176, y + 25, it.desc, { size: 13, color: '#bfc4ee' });
-      addText(this, M, 620, y + 12, `${shopPrice(k, it.price)}g`, { size: 18, bold: true, color: COL.gold, align: 'right' });
-      if (why) addText(this, M, 640, y + 14, why, { size: 12, color: '#7a7f99' });
-      addButton(this, M, 760, y + 4, 92, 36, 'Buy', () => this.dispatch({ type: 'buy', itemId: id }), { size: 16, enabled: why === null, fill: 0x2f7a4a });
-    });
-    const q = healQuote(k);
-    const hy = 90 + (nd.stock?.length ?? 0) * 50 + 8;
-    addPanel(this, M, 166, hy, 692, 44, 0x1c2042);
-    addText(this, M, 176, hy + 12, q.hp > 0 ? `Healer: restore ${q.hp} HP for ${q.cost}g` : k.hp >= e.maxHp ? 'Healer: you are in full health' : 'Healer: you cannot afford any healing', { size: 16, bold: true });
-    addButton(this, M, 760, hy + 4, 92, 36, 'Heal', () => this.dispatch({ type: 'heal' }), { size: 16, enabled: q.hp > 0, fill: 0x2f7a4a });
-    addButton(this, M, 166, hy + 56, 692, 50, 'Leave the village', () => this.dispatch({ type: 'leave' }), { size: 20, fill: COL.primary });
-  }
-
-  private drawPvpLoot(): void {
-    const s = this.state;
-    const pl = s.pendingLoot!;
-    const w = s.players[pl.winner];
-    const l = s.players[pl.loser];
-    if (w.bot) return;
-    const M = this.modalLayer;
-    this.overlay(0.85);
-    addPanel(this, M, 232, 130, 560, 300);
-    addText(this, M, 512, 148, `${w.name} wins the duel!`, { size: 28, bold: true, align: 'center', color: hex(w.color) });
-    addText(this, M, 512, 190, `${l.name} falls. Choose your spoils:`, { size: 18, align: 'center' });
-    const can = stealableSeals(s, w.id, l.id).length > 0;
-    const half = Math.floor(l.gold * CONFIG.deathGoldLoss);
-    addButton(this, M, 262, 236, 500, 70, 'Take a Seal', () => this.dispatch({ type: 'pvpLoot', take: 'seal' }), {
-      size: 22, enabled: can, fill: 0x8a2b2b, sub: can ? `${l.name} holds ${l.seals.length} Seal(s); one you lack is taken` : `${l.name} holds no Seal you lack`,
-    });
-    addButton(this, M, 262, 322, 500, 70, `Take ${half} gold`, () => this.dispatch({ type: 'pvpLoot', take: 'gold' }), {
-      size: 22, fill: 0x9a7b14, sub: `Half of ${l.name}'s ${l.gold} gold`,
-    });
-  }
-
-  private drawEvent(): void {
-    const s = this.state;
-    const e = s.event!;
-    const k = s.players[s.current];
-    if (k.bot) return;
-    const M = this.modalLayer;
-    this.overlay(0.8);
-    const h = 190 + e.options.length * 70;
-    const y0 = (H - h) / 2;
-    addPanel(this, M, 212, y0, 600, h);
-    addText(this, M, 512, y0 + 16, e.title, { size: 28, bold: true, serif: true, align: 'center', color: '#e8d6a8' });
-    addText(this, M, 512, y0 + 60, e.text, { size: 17, align: 'center', wrap: 540 });
-    addText(this, M, 790, y0 + 20, `Gold ${k.gold}`, { size: 15, bold: true, align: 'right', color: COL.gold });
-    e.options.forEach((o, i) => {
-      const why = eventOptionBlock(s, i);
-      addButton(this, M, 252, y0 + 150 + i * 70, 520, 60, o.label, () => this.dispatch({ type: 'eventChoice', index: i }), {
-        size: 19, enabled: why === null, fill: i === e.options.length - 1 ? 0x3a3446 : COL.primary, sub: why ?? o.hint,
-      });
-    });
-  }
-
-  private drawLevelUp(): void {
-    const s = this.state;
-    const k = s.players[s.current];
-    if (k.bot) return;
-    const M = this.modalLayer;
-    this.overlay(0.85);
-    addPanel(this, M, 132, 90, 760, 380);
-    addText(this, M, 512, 108, 'LEVEL UP', { size: 34, bold: true, serif: true, align: 'center', color: '#ffd36a' });
-    addText(this, M, 512, 152, `${k.name}'s renown grows (${k.renown} victories). Choose a boon - it lasts all game.`, { size: 16, align: 'center', color: COL.dim, wrap: 700 });
-    (s.boonChoices ?? []).forEach((id, i) => {
-      const b = getBoon(id);
-      const x = 162 + i * 240;
-      addButton(this, M, x, 200, 220, 220, b.name, () => { audio.play('chime'); this.dispatch({ type: 'chooseBoon', id }); }, { size: 26, fill: 0x3a2f5e, sub: b.desc });
-    });
-    if (k.boons.length) addText(this, M, 512, 436, `Boons so far: ${k.boons.map((id) => getBoon(id).name).join(', ')}`, { size: 13, align: 'center', color: COL.dim });
-  }
-
-  /** End-of-game summary: standings and per-knight story of the hunt. */
-  private drawGameOver(): void {
-    const s = this.state;
-    const M = this.modalLayer;
-    const w = s.players[s.winner!];
-    this.overlay(0.92);
-    addPanel(this, M, 32, 20, 960, 536);
-    addText(this, M, 512, 30, 'THE HUNT IS OVER', { size: 16, align: 'center', color: COL.dim });
-    addText(this, M, 512, 50, `${w.name} wins!`, { size: 38, bold: true, serif: true, align: 'center', color: hex(w.color) });
-    addText(this, M, 512, 98, s.endReason === 'sanctum' ? `Slew the Hollow Warden on day ${s.day} and claimed the Sanctum.` : `Day ${CONFIG.dayCap} ended: most Seals (then gold) wins.`, { size: 16, align: 'center', wrap: 900 });
-    const cols: [string, number][] = [['Knight', 60], ['Seals', 300], ['Gold', 370], ['Fights won', 440], ['Duels', 550], ['Deaths', 620], ['Levels', 700], ['Scars', 780]];
-    for (const [label, x] of cols) addText(this, M, x, 134, label, { size: 13, bold: true, color: COL.dim });
-    const ranked = [...s.players].sort((a, b) => (b.id === w.id ? 1 : 0) - (a.id === w.id ? 1 : 0) || b.seals.length - a.seals.length || b.gold - a.gold);
-    ranked.forEach((p, i) => {
-      const y = 160 + i * 62;
-      addPanel(this, M, 50, y - 6, 924, 56, p.id === w.id ? 0x2a2236 : 0x1a1626);
-      this.modalLayer.add(this.add.circle(68, y + 12, 9, p.color));
-      addText(this, M, 84, y, p.name, { size: 19, bold: true, serif: true, color: hex(p.color) });
-      addText(this, M, 84, y + 24, p.boons.length ? p.boons.map((id) => getBoon(id).name).join(', ') : 'no boons', { size: 11, color: COL.dim, wrap: 200 });
-      addText(this, M, 300, y + 4, `${p.seals.length}/4`, { size: 18 });
-      addText(this, M, 370, y + 4, `${p.gold}`, { size: 18, color: COL.gold });
-      addText(this, M, 440, y + 4, `${p.kills}`, { size: 18 });
-      addText(this, M, 550, y + 4, `${p.duelsWon}`, { size: 18 });
-      addText(this, M, 620, y + 4, `${p.deaths}`, { size: 18, color: p.deaths ? COL.bad : COL.text });
-      addText(this, M, 700, y + 4, `${p.boons.length}`, { size: 18 });
-      addText(this, M, 780, y, p.scars.length ? p.scars.map((id) => getScar(id).name).join(', ') : 'unscarred', { size: 12, color: p.scars.length ? COL.bad : COL.dim, wrap: 180 });
-    });
-    // awards
-    const most = (f: (k: Knight) => number) => [...s.players].sort((a, b) => f(b) - f(a))[0];
-    const feared = most((k) => k.kills);
-    const scarred = most((k) => k.scars.length);
-    const rich = most((k) => k.goldEarned);
-    const awards = [
-      `Most Feared: ${feared.name} (${feared.kills} wins)`,
-      scarred.scars.length ? `Most Scarred: ${scarred.name} (${scarred.scars.length})` : 'Nobody was scarred',
-      `Deepest Purse: ${rich.name} (${rich.goldEarned} gold earned)`,
-    ];
-    addText(this, M, 512, 160 + s.players.length * 62 + 4, awards.join('     '), { size: 14, align: 'center', color: '#e8d6a8', wrap: 900 });
-    addButton(this, M, 312, 488, 400, 54, 'Back to setup', () => this.onExit(), { size: 22, fill: COL.primary });
   }
 
   // ------------------------------------------------------------ combat

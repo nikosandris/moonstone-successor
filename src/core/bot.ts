@@ -281,7 +281,7 @@ function combatAction(s: GameState, forced?: 'a' | 'b'): Action {
   } else {
     choice = bestVsMonster(s, me, them, allowed);
   }
-  return { type: 'choose', side, choice };
+  return { type: 'choose', side, choice, perfect: noise(s, 313 + c.round) < CONFIG.botPerfectRate };
 }
 
 function bestVsMonster(s: GameState, me: ReturnType<typeof combatFighters>['a'], them: ReturnType<typeof combatFighters>['b'], allowed: Choice[]): Choice {

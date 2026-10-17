@@ -77,7 +77,7 @@ export function showSettings(opts: { inGame?: boolean; onQuit?: () => void; onCh
       }
       return g;
     };
-    row('Duels', group([['arena', 'Arena (real-time)'], ['classic', 'Classic duel']], s.duelMode, (v) => updateSettings({ duelMode: v as Settings['duelMode'] })));
+    row('Duels', group([['arena3d', '3D Arena'], ['arena', '2D Arena'], ['classic', 'Classic']], s.duelMode, (v) => updateSettings({ duelMode: v as Settings['duelMode'] })));
     const vol = document.createElement('input');
     vol.type = 'range';
     vol.min = '0';

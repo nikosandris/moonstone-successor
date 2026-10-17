@@ -1,6 +1,6 @@
 # Moonblood
 
-A dark-fantasy hot-seat board adventure with real-time duels, for 2-4 knights on one device. It is a spiritual successor to the 1991 Amiga classic *Moonstone: A Hard Days Knight*, using original names, rules, art and sound. Everything you see and hear is generated in code: there are no image or audio files.
+A dark-fantasy hot-seat board adventure with real-time 3D duels, for 2-4 knights on one device. It is a spiritual successor to the 1991 Amiga classic *Moonstone: A Hard Days Knight*, using original names, rules, art and sound. The 3D arena uses CC0 KayKit models; icons come from game-icons.net and the fonts are Cinzel and Spectral (see [CREDITS.md](CREDITS.md)). The terrain, map art, moon and all sounds are generated in code.
 
 **Play:** <https://nikosandris.github.io/moonstone-successor/>
 
@@ -38,6 +38,7 @@ npm test           # Vitest unit tests for every rule
 npm run build      # strict type-check + production build (dist/)
 npm run preview    # serve the production build
 npm run sim        # 1000 bot-vs-bot games -> docs/balance-report.md
+npm run assets     # re-download and optimise the CC0 3D models into public/assets/3d
 ```
 
 - `npm run sim -- --games 200 --seed 5 --out /tmp/report.md` runs a custom simulation.

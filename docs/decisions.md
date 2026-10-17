@@ -37,3 +37,12 @@ One line each: decision - reasoning.
 - M7: Space/Enter roll the die and end the turn (plus the arena keys) so a keyboard-only player never needs the mouse on desktop.
 - M7: Leather Jerkin raised to +2 Defense - at +1 it was never an upgrade over the starting coat (0 uses in the sim).
 - M7: Light2D `maxLights` raised to 16 so all 13 map lights render.
+
+## Phase 3 (3D)
+- N1: Browser 3D with three.js (WebGL2) instead of Unreal - it is the only option that can be built, screenshot-tested and deployed from this environment; GitHub Pages hosting stays.
+- N1: Characters are CC0 KayKit (stylised low-poly) - no realistic, rigged, animated, freely licensed medieval characters are reachable from here (only GitHub raw and npm are allowed hosts). Realistic route = Mixamo characters/animations supplied by the owner (Adobe login required).
+- N1: All KayKit characters share one rig, so animations live in one shared `anims.glb` (460 KB) and each character file has meshes only (~150 KB); meshopt compression; total 3D payload ~2 MB.
+- N1: "Perfect read" = committing in the last 30% of the reaction window adds x1.5 damage on a won exchange (core `perfect` flag, tested); bots land it 25% of the time in the sim. Inspired by the reactive-timing turn combat of Clair Obscur: Expedition 33.
+- N1: Monsters reuse recoloured/re-armed KayKit characters until bespoke monster models (N2).
+- N1: The whole map interface moved from Phaser-drawn boxes to an HTML/CSS design system (Cinzel/Spectral, gilded frames, medallions, crest-shaped action sigils, game-icons.net glyphs) - CSS/SVG gives far richer, crisper UI than canvas primitives. Classic-duel mode screens stay in Phaser.
+- N1: 3D Arena is the default duel mode; 2D Arena and Classic remain in Settings; the 3D arena falls back to 2D until models load or if WebGL2 is missing.

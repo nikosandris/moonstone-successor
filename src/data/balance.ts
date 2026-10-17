@@ -23,6 +23,10 @@ export const CONFIG = {
   },
   pvpHalfGold: 0.5,
   roadEventChance: 0.5,
+  /** damage multiplier for a winning perfectly-timed choice in the arena */
+  perfectMult: 1.5,
+  /** how often a bot lands a perfect read (simulates a skilled arena player) */
+  botPerfectRate: 0.25,
   /** extra modifiers for a monster in its own strong / weak phase */
   affinity: {
     strong: { hpMult: 1.15, attack: 1 },

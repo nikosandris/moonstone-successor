@@ -189,6 +189,10 @@ export interface Combat {
   staminaB: number;
   maxStaminaA: number;
   maxStaminaB: number;
+  /** a timed read in the real-time arena: a winning perfect choice deals extra damage */
+  perfectA: boolean;
+  perfectB: boolean;
+  lastPerfect: 'a' | 'b' | null;
   choiceA: Choice | null;
   choiceB: Choice | null;
   lastA: Choice | null;
@@ -252,7 +256,7 @@ export type Action =
   | { type: 'leave' }
   | { type: 'flee' }
   | { type: 'challenge'; target: number }
-  | { type: 'choose'; side: 'a' | 'b'; choice: Choice }
+  | { type: 'choose'; side: 'a' | 'b'; choice: Choice; perfect?: boolean }
   | { type: 'continue' }
   | { type: 'pvpLoot'; take: 'seal' | 'gold' }
   | { type: 'eventChoice'; index: number }
