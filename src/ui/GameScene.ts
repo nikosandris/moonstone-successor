@@ -18,7 +18,7 @@ import {
 import { generateTextures } from './art/textures';
 import { audio } from './audio';
 import { Arena3D } from './arena3d/Arena3D';
-import { is3dReady, preload3d, webgl2Available } from './arena3d/assets3d';
+import { is3dReady, preload3d, preloadAllSf, webgl2Available } from './arena3d/assets3d';
 import { showSettings } from './overlays';
 import { MapHud, type TutorialStep } from './hud/MapHud';
 import { saveGame } from './save';
@@ -107,7 +107,9 @@ export class GameScene extends Phaser.Scene {
     this.applySpeed();
     onSettings(() => this.applySpeed());
     // load the 3D arena models in the background; fights use the 2D arena until they are ready
-    if (webgl2Available()) preload3d().catch((e) => console.warn('3D assets failed to load, using the 2D arena', e));
+    if (webgl2Available()) {
+      preload3d().then(() => preloadAllSf(), (e) => console.warn('3D assets failed to load, using the 2D arena', e));
+    }
     this.events.once('shutdown', () => Arena3D.closeCurrent());
     this.events.once('destroy', () => Arena3D.closeCurrent());
     // keyboard: Space/Enter rolls the die or ends the turn

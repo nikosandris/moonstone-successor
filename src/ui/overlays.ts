@@ -1,5 +1,6 @@
 // DOM overlays (rules and settings): scrollable, keyboard friendly, readable on phones.
 import { CONFIG } from '../data/balance';
+import SF_CREDITS from '../data/sfCredits.json';
 import { getSettings, updateSettings, type Settings } from './settings';
 
 function overlay(title: string): { root: HTMLDivElement; body: HTMLDivElement; close: () => void } {
@@ -46,7 +47,15 @@ export function showRules(): void {
   <h3>Renown</h3>
   <p>Victories build renown. At 2, 4, 7, 11 and 16 victories you level up and choose one of three permanent boons.</p>
   <h3>Duels</h3>
-  <p>Stop where a rival stands to challenge them. The winner takes a Seal they lack, or half the loser's gold; the loser suffers a normal death. In arena duels both players press at the same time on one device (left A/S/D, right J/K/L); presses stay hidden until the clash.</p>`;
+  <p>Stop where a rival stands to challenge them. The winner takes a Seal they lack, or half the loser's gold; the loser suffers a normal death. In arena duels both players press at the same time on one device (left A/S/D, right J/K/L); presses stay hidden until the clash.</p>
+  <h3>Credits</h3>
+  <p>Realistic 3D models from Sketchfab, used under Creative Commons Attribution:</p>
+  <ul class="credits">${SF_CREDITS.map((c) => `<li><a href="${c.url}" target="_blank" rel="noopener">${esc(c.name)}</a> by ${esc(c.author)}</li>`).join('')}</ul>
+  <p>Stylised characters and props: KayKit by Kay Lousberg (CC0). Icons: game-icons.net (CC BY 3.0). Fonts: Cinzel, Spectral (OFL).</p>`;
+}
+
+function esc(t: string): string {
+  return t.replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch]!);
 }
 
 export function showSettings(opts: { inGame?: boolean; onQuit?: () => void; onChange?: (s: Settings) => void } = {}): void {

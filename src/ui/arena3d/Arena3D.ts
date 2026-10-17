@@ -40,17 +40,17 @@ const MONSTER_ICON: Record<string, string> = {
   giantSpider: 'spider-face', marshSerpent: 'snake', boneGolem: 'golem-head', guardian: 'spectre',
 };
 
-/** N1: monsters reuse the KayKit characters (re-coloured, re-armed, re-scaled) until bespoke models land. */
+/** Stylised KayKit fallbacks (re-coloured, re-armed, re-scaled); `sf` names the realistic model used once it has loaded. */
 const MONSTER_LOOK: Record<string, ActorLook> = {
-  direWolf: { model: 'skeleton_minion', wash: 0x6b6f80, washAmount: 0.25, weapon: 'w_skeleton_blade', scale: 0.95 },
-  bogTroll: { model: 'barbarian', wash: 0x4f6b3a, washAmount: 0.55, scale: 1.3, weapon: 'w_axe2h' },
-  rustKnight: { model: 'skeleton_warrior', wash: 0x8a5a3a, washAmount: 0.45, weapon: 'w_skeleton_axe', offhand: 'w_skeleton_shield' },
-  caveDrake: { model: 'skeleton_mage', wash: 0x7a2f2f, washAmount: 0.45, scale: 1.15, weapon: 'w_skeleton_staff' },
+  direWolf: { sf: 'direWolf', model: 'skeleton_minion', wash: 0x6b6f80, washAmount: 0.25, weapon: 'w_skeleton_blade', scale: 0.95 },
+  bogTroll: { sf: 'bogTroll', model: 'barbarian', wash: 0x4f6b3a, washAmount: 0.55, scale: 1.3, weapon: 'w_axe2h' },
+  rustKnight: { sf: 'rustKnight', model: 'skeleton_warrior', wash: 0x8a5a3a, washAmount: 0.45, weapon: 'w_skeleton_axe', offhand: 'w_skeleton_shield' },
+  caveDrake: { sf: 'caveDrake', model: 'skeleton_mage', wash: 0x7a2f2f, washAmount: 0.45, scale: 1.15, weapon: 'w_skeleton_staff' },
   bandit: { model: 'rogue', wash: 0x5a4a3a, washAmount: 0.3, weapon: 'w_dagger' },
-  giantSpider: { model: 'skeleton_rogue', wash: 0x3a2a3a, washAmount: 0.5, weapon: 'w_dagger' },
-  marshSerpent: { model: 'skeleton_minion', wash: 0x2f5a4a, washAmount: 0.5, weapon: 'w_skeleton_blade' },
-  boneGolem: { model: 'skeleton_warrior', wash: 0xbab8a0, washAmount: 0.3, scale: 1.4, weapon: 'w_axe2h' },
-  guardian: { model: 'skeleton_warrior', wash: 0x3a3f80, washAmount: 0.5, scale: 1.45, weapon: 'w_skeleton_axe', offhand: 'w_skeleton_shield', aura: 0x4a6aff },
+  giantSpider: { sf: 'giantSpider', model: 'skeleton_rogue', wash: 0x3a2a3a, washAmount: 0.5, weapon: 'w_dagger' },
+  marshSerpent: { sf: 'marshSerpent', model: 'skeleton_minion', wash: 0x2f5a4a, washAmount: 0.5, weapon: 'w_skeleton_blade' },
+  boneGolem: { sf: 'boneGolem', model: 'skeleton_warrior', wash: 0xbab8a0, washAmount: 0.3, scale: 1.4, weapon: 'w_axe2h' },
+  guardian: { sf: 'guardian', model: 'skeleton_warrior', wash: 0x3a3f80, washAmount: 0.5, scale: 1.45, weapon: 'w_skeleton_axe', offhand: 'w_skeleton_shield', aura: 0x4a6aff },
 };
 
 const CSS = `
@@ -167,18 +167,24 @@ export class Arena3D {
     this.world.fx.bloodOn = getSettings().blood;
 
     const ka = s.players[c.a];
-    this.a = new Actor3D({ model: 'knight', tint: ka.color });
+    this.a = new Actor3D({ model: 'knight', sf: 'knight', tint: ka.color });
     if (c.monsterId) this.b = new Actor3D(MONSTER_LOOK[c.monsterId] ?? MONSTER_LOOK.rustKnight);
     else {
       const kb = s.players[c.b!];
-      this.b = new Actor3D({ model: 'knight', tint: kb.color });
+      this.b = new Actor3D({ model: 'knight', sf: 'knight', tint: kb.color });
     }
+    // big creatures stand further back so bodies never interpenetrate
+    // (the front of each body keeps its old mark; long tails and wings extend backwards)
+    this.homeA.x = -1.55 - Math.max(0, this.a.reach - 0.45) * 0.7;
+    this.homeB.x = 1.55 + Math.max(0, this.b.reach - 0.45) * 0.7;
     this.a.root.position.copy(this.homeA);
     this.a.root.rotation.y = Math.PI / 2;
     this.b.root.position.copy(this.homeB);
     this.b.root.rotation.y = -Math.PI / 2;
     this.world.scene.add(this.a.root, this.b.root);
-    this.world.setCamera(new THREE.Vector3(-1.2, 1.9, 7.4), new THREE.Vector3(0, 1.0, 0));
+    const mid = (this.homeA.x + this.homeB.x) / 2;
+    const pull = 1 + Math.max(0, this.homeB.x - this.homeA.x - 3.1) * 0.12;
+    this.world.setCamera(new THREE.Vector3(mid - 1.2, 1.9 * pull, 7.4 * pull), new THREE.Vector3(mid, 1.0, 0));
     if (c.monsterId) this.b.play(c.round === 0 && c.kind !== 'wild' ? 'Spawn_Ground' : 'Idle_Combat', { loop: false, fade: 0 });
     this.after(1600, () => { if (this.phase === 'prep') this.b.play('Idle_Combat'); });
 
@@ -254,6 +260,10 @@ export class Arena3D {
     const actor = this.actor(side);
     const home = side === 'a' ? this.homeA : this.homeB;
     const dir = side === 'a' ? 1 : -1;
+    if (dist > 0) {
+      const gap = this.homeB.x - this.homeA.x - this.a.reach - this.b.reach;
+      dist = Math.min(dist, Math.max(0.15, gap - 0.3));
+    }
     this.moves = this.moves.filter((m) => m.obj !== actor.root);
     this.moves.push({ obj: actor.root, from: home.clone(), to: home.clone().add(new THREE.Vector3(dist * dir, 0, 0)), t: 0, dur, back });
   }

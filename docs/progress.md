@@ -128,3 +128,20 @@
 **Known issues**
 - Characters are stylised low-poly (no realistic CC0 animated characters are reachable from this environment).
 - Headless tests render WebGL in software at low FPS; real-device frame rate not measured.
+
+## N1b - Realistic models
+
+**Done**
+- Sketchfab pipeline as a GitHub Action: automated search with thumbnails, download with the owner's API key (repo secret), conversion and compression, credits, commit.
+- 9 realistic animated models in the 3D arena: an armoured king for the knights (player colour on cape and plume, realistic longsword), wolf, troll, caped dark knight with axe, European dragon, giant spider, anaconda, rock golem recoloured to bone, and a floating lich as the Hollow Warden.
+- Per-model animation mapping with procedural fill-in for missing moves; spacing, lunges and camera adapt to body size; image-based lighting.
+- Dev viewer (`dev/viewer.html` on the Vite dev server) to check size, facing, grips and moves for every model.
+
+**Verification**
+- `npm test`: 121 pass. `npm run build`: 0 errors. Core rules untouched, so the sim figures stand.
+- Playwright (desktop + 800x360 touch): every monster in idle, wind-up and impact; full fights to the death (wolf, troll on touch, drake on touch); death animations for all models in the viewer. 0 console errors.
+
+**Known issues**
+- Only the troll, golem, spider and serpent ship real attack clips; the knight, dark knight, wolf, drake and lich strike with procedural body motion plus their idle.
+- The Road Bandit still uses the stylised model (no good realistic match found).
+- About 8.5 MB extra download (background, after the game is playable).

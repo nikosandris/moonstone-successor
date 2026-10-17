@@ -5,6 +5,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import type { MoonPhase } from '../../core/types';
 import { drawFog, drawMoon } from '../art/textures';
 import { cloneProp, type PropFile } from './assets3d';
@@ -59,6 +60,7 @@ export class World3D {
   readonly scene = new THREE.Scene();
   readonly camera = new THREE.PerspectiveCamera(38, 16 / 9, 0.1, 200);
   readonly fx = new Fx3D();
+  private envMap: THREE.Texture | null = null;
   private composer: EffectComposer;
   private vignette: ShaderPass;
   private bloom: UnrealBloomPass;
@@ -158,8 +160,14 @@ export class World3D {
     key.shadow.normalBias = 0.02;
     s.add(key);
     s.add(new THREE.HemisphereLight(0x5a6a9a, 0x1a1418, stage === 'lair' ? 0.9 : 1.0));
+    // image-based light so the realistic models' metal and leather read (black otherwise)
+    const pmrem = new THREE.PMREMGenerator(this.renderer);
+    this.envMap = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    pmrem.dispose();
+    s.environment = this.envMap;
+    s.environmentIntensity = stage === 'lair' ? 0.32 : 0.4;
     // soft front fill so faces read against the dark
-    const fill = new THREE.DirectionalLight(0xffe0c0, 0.45);
+    const fill = new THREE.DirectionalLight(0xffe0c0, 0.7);
     fill.position.set(-1, 2.5, 8);
     s.add(fill);
     const rim = new THREE.DirectionalLight(0x6a8cff, 0.8);
@@ -335,6 +343,7 @@ export class World3D {
       const m = o as THREE.Mesh;
       if (m.geometry) m.geometry.dispose();
     });
+    this.envMap?.dispose();
     this.composer.dispose();
     this.renderer.dispose();
   }

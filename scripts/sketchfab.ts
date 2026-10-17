@@ -113,6 +113,12 @@ async function fetchPicks(): Promise<void> {
     return `- **${f.replace('.json', '')}**: "${m.name}" by ${m.author} (${m.license}) - ${m.url}`;
   });
   writeFileSync(join(OUT, 'CREDITS.md'), `# Sketchfab models\n\n${credits.join('\n')}\n`);
+  // the in-game credits list (Rules sheet) is built from this
+  const list = readdirSync(OUT).filter((f) => f.endsWith('.json')).sort().map((f) => {
+    const m = JSON.parse(readFileSync(join(OUT, f), 'utf8'));
+    return { name: m.name, author: m.author, license: m.license, url: m.url };
+  });
+  writeFileSync('src/data/sfCredits.json', JSON.stringify(list, null, 2) + '\n');
   if (failed.length) console.log(`failed: ${failed.join(', ')}`);
 }
 
