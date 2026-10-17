@@ -10,6 +10,7 @@ import { CONFIG } from '../../data/balance';
 import { getItem } from '../../data/items';
 import { getMonster } from '../../data/monsters';
 import { audio } from '../audio';
+import { t, td, tlog, tn } from '../i18n';
 import { getSettings, reactionScale } from '../settings';
 import { hex } from '../theme';
 import { icon } from '../hud/icons';
@@ -41,7 +42,7 @@ const MONSTER_ICON: Record<string, string> = {
 };
 
 /** Stylised KayKit fallbacks (re-coloured, re-armed, re-scaled); `sf` names the realistic model used once it has loaded. */
-const MONSTER_LOOK: Record<string, ActorLook> = {
+export const MONSTER_LOOK: Record<string, ActorLook> = {
   direWolf: { sf: 'direWolf', model: 'skeleton_minion', wash: 0x6b6f80, washAmount: 0.25, weapon: 'w_skeleton_blade', scale: 0.95 },
   bogTroll: { sf: 'bogTroll', model: 'barbarian', wash: 0x4f6b3a, washAmount: 0.55, scale: 1.3, weapon: 'w_axe2h' },
   rustKnight: { sf: 'rustKnight', model: 'skeleton_warrior', wash: 0x8a5a3a, washAmount: 0.45, weapon: 'w_skeleton_axe', offhand: 'w_skeleton_shield' },
@@ -73,6 +74,16 @@ const CSS = `
 .a3d-banner .mb-banner{font-size:2.3em}
 .a3d-banner.perfect .mb-banner{font-size:3.4em}
 .a3d-log{position:absolute;bottom:12.4em;left:50%;transform:translateX(-50%);width:34em;text-align:center;font:italic .82em/1.35 var(--text);color:#e9dfcc;text-shadow:0 1px 3px #000,0 0 8px #000}
+.a3d-intent{position:absolute;display:flex;align-items:center;gap:.55em;padding:.45em 1.1em .45em .45em;border-radius:2em;transform:translate(-50%,-100%) scale(.8);opacity:0;pointer-events:none;transition:opacity .15s,transform .2s cubic-bezier(.2,1.6,.4,1);white-space:nowrap;background:linear-gradient(#0d0a12f0,#0d0a12d0);box-shadow:0 0 0 2px var(--k),0 0 24px var(--k),0 8px 20px #000c}
+.a3d-intent.on{opacity:1;transform:translate(-50%,-100%) scale(1)}
+.a3d-intent .ic{width:2.3em;height:2.3em;border-radius:50%;display:grid;place-items:center;color:#fff;background:radial-gradient(circle at 50% 35%,var(--k),#000 120%);box-shadow:0 0 0 2px #000,0 0 12px var(--k)}
+.a3d-intent .ic .ico{width:62%;height:62%}
+.a3d-intent .tx b{display:block;font:700 1.15em/1 var(--serif);letter-spacing:.14em;text-transform:uppercase;color:var(--k);text-shadow:0 0 10px var(--k),0 2px 0 #000}
+.a3d-intent .tx small{display:block;font:italic .72em/1.3 var(--text);color:#efe3c8;margin-top:.2em}
+.a3d-intent .tx small b{display:inline;font:inherit;font-weight:700;font-style:normal;letter-spacing:0;text-transform:none;color:#fff;text-shadow:none}
+.a3d-intent .tx small b.r{color:#ff6a50}.a3d-intent .tx small b.g{color:#ffd23a}
+.a3d-intent.k-guard{--k:#3aa0ff}.a3d-intent.k-strike{--k:#ff3a1c}.a3d-intent.k-feint{--k:#ffc030;animation:a3dflick .18s steps(2) infinite}.a3d-intent.k-windup{--k:#b9b0d8}
+@keyframes a3dflick{50%{filter:brightness(1.6)}}
 .a3d-pop{position:absolute;pointer-events:none;transform:translate(-50%,0);animation:a3dpop 1.15s ease-out forwards;white-space:nowrap}
 @keyframes a3dpop{0%{transform:translate(-50%,.3em) scale(.5);opacity:0}14%{transform:translate(-50%,-.3em) scale(1.25);opacity:1}30%{transform:translate(-50%,-.5em) scale(1)}100%{transform:translate(-50%,-2.8em) scale(.95);opacity:0}}
 .a3d-arc{position:absolute;left:50%;bottom:8.3em;transform:translateX(-50%);width:26em;height:4.4em;opacity:0;transition:opacity .15s;overflow:visible}
@@ -139,7 +150,7 @@ export class Arena3D {
   private els!: {
     plates: Record<Side, HTMLDivElement>; title: HTMLDivElement; banner: HTMLDivElement; log: HTMLDivElement;
     timing: HTMLDivElement; tfill: HTMLDivElement; tmark: HTMLDivElement; controls: HTMLDivElement; help: HTMLDivElement;
-    items: HTMLDivElement; itemsR: HTMLDivElement;
+    items: HTMLDivElement; itemsR: HTMLDivElement; intent: HTMLDivElement;
   };
   private onKey = (e: KeyboardEvent) => this.key(e);
   private onResize = () => this.layout();
@@ -289,15 +300,16 @@ export class Arena3D {
       <path class="zone" d="${arcPath}" pathLength="100" stroke-dasharray="${(1 - PERFECT_FROM) * 100} 100" stroke-dashoffset="${-PERFECT_FROM * 100}"/>
       <path class="prog" d="${arcPath}" pathLength="100" stroke-dasharray="0 100"/>
       <circle class="mark" r="5" cx="-50" cy="-50"/>
-      <text x="372" y="70" text-anchor="end">PERFECT</text></svg>`);
+      <text x="372" y="70" text-anchor="end">${t('PERFECT')}</text></svg>`);
     const controls = el('div', 'a3d-controls');
     const help = el('div', 'a3d-help');
     const items = el('div', 'a3d-items');
     const itemsR = el('div', 'a3d-items r');
-    this.hud.append(plates.a, plates.b, title, log, banner, timing, help, items, itemsR, controls);
+    const intent = el('div', 'a3d-intent');
+    this.hud.append(plates.a, plates.b, title, log, banner, timing, help, items, itemsR, controls, intent);
     this.els = {
       plates, title, banner, log, timing, tfill: timing.querySelector('.prog') as unknown as HTMLDivElement, tmark: timing.querySelector('.mark') as unknown as HTMLDivElement,
-      controls, help, items, itemsR,
+      controls, help, items, itemsR, intent,
     };
     this.refreshHud();
   }
@@ -329,7 +341,7 @@ export class Arena3D {
       const sta = side === 'a' ? c.staminaA : c.staminaB;
       const max = side === 'a' ? c.maxStaminaA : c.maxStaminaB;
       const f = side === 'a' ? fighters.a : fighters.b;
-      const name = k ? k.name : c.monster!.name;
+      const name = k ? k.name : tn(c.monster!.name);
       const color = k ? hex(k.color) : '#ff8a70';
       const pct = Math.max(0, (hp.hp / hp.maxHp) * 100);
       const plateEl = this.els.plates[side];
@@ -342,7 +354,7 @@ export class Arena3D {
           <div class="mb-runes${right}"></div><div class="a3d-stats"></div></div>`;
         plateEl.dataset.built = '1';
       }
-      const ready = this.locked[side] && c.kind === 'pvp' && this.phase === 'window' ? '<span class="a3d-ready">Ready</span>' : '';
+      const ready = this.locked[side] && c.kind === 'pvp' && this.phase === 'window' ? `<span class="a3d-ready">${t('Ready')}</span>` : '';
       (plateEl.querySelector('.a3d-name') as HTMLElement).innerHTML = side === 'a' ? `<span style="color:${color}">${name}</span>${ready}` : `${ready}<span style="color:${color}">${name}</span>`;
       const bar = plateEl.querySelector('.mb-bar') as HTMLElement;
       bar.classList.toggle('low', pct < 30);
@@ -350,12 +362,12 @@ export class Arena3D {
       (bar.querySelector('.ghost') as HTMLElement).style.width = `${pct}%`;
       (bar.querySelector('.val') as HTMLElement).textContent = `${hp.hp} / ${hp.maxHp}`;
       (plateEl.querySelector('.mb-runes') as HTMLElement).innerHTML = Array.from({ length: max }, (_, i) => `<i class="${i < sta ? 'on' : ''}"></i>`).join('');
-      (plateEl.querySelector('.a3d-stats') as HTMLElement).textContent = `Attack ${f.offense} · Defense ${f.defense}`;
+      (plateEl.querySelector('.a3d-stats') as HTMLElement).textContent = t('Attack {a} · Defense {d}', { a: f.offense, d: f.defense });
     }
-    const kind = c.kind === 'pvp' ? 'Duel' : c.kind === 'guardian' ? 'The Warden' : c.kind === 'wild' ? 'Ambush' : 'Lair';
+    const kind = t(c.kind === 'pvp' ? 'Duel' : c.kind === 'guardian' ? 'The Warden' : c.kind === 'wild' ? 'Ambush' : 'Lair');
     const aff = c.monsterId ? affinityText(c.monsterId, s.day) : null;
-    this.els.title.innerHTML = `<div class="mb-title">${kind} &nbsp;·&nbsp; Round ${c.round + 1}</div><div class="mb-rule"></div>${c.monsterId ? `<div class="hint">${getMonster(c.monsterId).hint}</div><div class="aff">${aff ?? moonEffect(s.day).text}</div>` : ''}`;
-    this.els.log.textContent = this.phase !== 'window' && c.roundLog.length ? c.roundLog.slice(1).join('  ') : '';
+    this.els.title.innerHTML = `<div class="mb-title">${kind} &nbsp;·&nbsp; ${t('Round {n}', { n: c.round + 1 })}</div><div class="mb-rule"></div>${c.monsterId ? `<div class="hint">${td(getMonster(c.monsterId).hint)}</div><div class="aff">${aff ? tlog(aff) : td(moonEffect(s.day).text)}</div>` : ''}`;
+    this.els.log.textContent = this.phase !== 'window' && c.roundLog.length ? c.roundLog.slice(1).map(tlog).join('  ') : '';
   }
 
   private banner(text: string, perfect = false, ms = 900, red = false): void {
@@ -391,7 +403,7 @@ export class Arena3D {
     const pvp = this.s.combat!.kind === 'pvp';
     const small = pvp && this.human('a') && this.human('b');
     (['strike', 'guard', 'feint'] as Choice[]).forEach((ch, i) => {
-      const b = el('button', `mb-act ${ch}${small ? ' small' : ''}`, `<span class="key">${keys[i]}</span>${icon(ACT_ICON[ch])}<span class="lbl">${LABEL[ch]}</span>${small ? '' : `<span class="beats">${BEATS[ch]}</span>`}`);
+      const b = el('button', `mb-act ${ch}${small ? ' small' : ''}`, `<span class="key">${keys[i]}</span>${icon(ACT_ICON[ch])}<span class="lbl">${t(LABEL[ch])}</span>${small ? '' : `<span class="beats">${t(BEATS[ch])}</span>`}`);
       b.disabled = !allowed.includes(ch) || !!this.locked[side];
       if (!pvp && this.locked[side] === ch) b.classList.add('sel');
       b.addEventListener('pointerdown', (e) => {
@@ -408,7 +420,7 @@ export class Arena3D {
     box.innerHTML = '';
     if (!k || k.bot || this.phase !== 'prep') return;
     k.consumables.forEach((id, i) => {
-      const b = el('button', 'mb-chip', `${icon('potion-ball')}<span>${getItem(id).name}</span>`);
+      const b = el('button', 'mb-chip', `${icon('potion-ball')}<span>${tn(getItem(id).name)}</span>`);
       b.addEventListener('pointerdown', (e) => {
         e.preventDefault();
         this.host.dispatch({ type: 'useItem', slot: i, who: k.id });
@@ -431,14 +443,14 @@ export class Arena3D {
       this.itemButtons('a');
       if (c.kind === 'pvp') this.itemButtons('b');
       if (c.round === 0 && (this.human('a') || this.human('b'))) {
-        this.button(ctl, 'Fight', 'Space / Enter', 'mb-big', () => this.startWindow());
+        this.button(ctl, t('Fight'), t('Space / Enter'), 'mb-big', () => this.startWindow());
         if (canFlee(s) && this.human('a')) {
           const cost = fleeCost(s.players[c.a]);
-          this.button(ctl, 'Flee', cost ? `drop ${cost} gold` : 'free', 'dark', () => this.host.dispatch({ type: 'flee' }));
+          this.button(ctl, t('Flee'), cost ? t('drop {n} gold', { n: cost }) : t('free'), 'dark', () => this.host.dispatch({ type: 'flee' }));
         }
         this.els.help.innerHTML = c.kind === 'pvp'
-          ? 'Both press together &mdash; left <b>A S D</b>, right <b>J K L</b>. Choices stay hidden until the clash. Late presses on the <b style="color:#ffd36a">gold</b> end of the arc are perfect.'
-          : `Read the wind-up: <b style="color:#6ec8ff">blue ward</b> Guard, <b style="color:#ff6b5a">red blade</b> Strike, <b style="color:#ffd23a">flicker</b> Feint. Answer late, on the <b style="color:#ffd36a">gold</b> end of the arc, for a perfect blow (×${CONFIG.perfectMult}).`;
+          ? t('Both press together &mdash; left <b>A S D</b>, right <b>J K L</b>. Choices stay hidden until the clash. Late presses on the <b style="color:#ffd36a">gold</b> end of the arc are perfect.')
+          : t('Read the wind-up: <b style="color:#6ec8ff">blue ward</b> Guard, <b style="color:#ff6b5a">red blade</b> Strike, <b style="color:#ffd23a">flicker</b> Feint. Answer late, on the <b style="color:#ffd36a">gold</b> end of the arc, for a perfect blow (×{n}).', { n: CONFIG.perfectMult });
       }
       return;
     }
@@ -455,7 +467,7 @@ export class Arena3D {
       return;
     }
     if (this.phase === 'over' && (this.human('a') || this.human('b'))) {
-      this.button(ctl, 'Continue', 'Space / Enter', 'mb-big', () => this.finish());
+      this.button(ctl, t('Continue'), t('Space / Enter'), 'mb-big', () => this.finish());
     }
   }
 
@@ -486,7 +498,7 @@ export class Arena3D {
     this.drawControls();
     const anyHuman = this.human('a') || this.human('b');
     if (c.round === 0 && anyHuman) return;
-    if (c.round > 0) this.after(350, () => { if (this.phase === 'prep') this.banner(`Round ${c.round + 1}`, false, 900); });
+    if (c.round > 0) this.after(350, () => { if (this.phase === 'prep') this.banner(t('Round {n}', { n: c.round + 1 }), false, 900); });
     this.after(c.round === 0 ? 1100 : 1900, () => this.startWindow());
   }
 
@@ -525,28 +537,56 @@ export class Arena3D {
     if (p >= 1) this.impact();
   }
 
-  /** Monster wind-up driven by real animation clips: Strike and Feint share the first half. */
+  /**
+   * The monster's wind-up, readable three ways at once: its body (clip or procedural pose), a coloured
+   * aura (model glow, ground ring, light) and a badge over its head. Strike and Feint share the first
+   * half of the wind-up; then Strike turns red and Feint flickers gold. Guard shows blue from the start.
+   */
   private telegraph(actor: Actor3D, choice: Choice, p: number): void {
     if (choice === 'guard') {
-      if (p > 0.15) {
-        actor.pose('Blocking', Math.min(1, (p - 0.15) * 1.5) * 0.5);
-        actor.setGlow(0x3aa0ff, Math.min(1, (p - 0.15) * 2));
-      }
+      const g = Math.min(1, p / 0.15);
+      actor.pose('Blocking', Math.min(1, p * 1.6) * 0.5);
+      actor.setGlow(0x3aa0ff, 0.35 + 0.65 * g);
+      this.showIntent('guard', p);
       return;
     }
     if (p <= 0.55) {
       actor.pose('1H_Melee_Attack_Chop', (p / 0.55) * 0.3);
-      actor.setGlow(0x000000, 0);
+      actor.setGlow(0xd8d0ff, 0.15 + 0.15 * Math.sin(p * 30) ** 2);
+      this.showIntent('windup', p);
       return;
     }
     const q = (p - 0.55) / 0.45;
     if (choice === 'strike') {
       actor.pose('1H_Melee_Attack_Chop', 0.3 + q * 0.08);
-      actor.setGlow(0xff2a10, 0.3 + q * 0.9);
+      actor.setGlow(0xff2a10, 0.55 + q * 0.45);
+      this.showIntent('strike', p);
     } else {
       actor.pose('1H_Melee_Attack_Slice_Horizontal', 0.08 + q * 0.18);
-      actor.setGlow(0xffc030, (0.25 + 0.75 * q) * (0.45 + 0.55 * Math.abs(Math.sin(p * 40))));
+      actor.setGlow(0xffc030, (0.45 + 0.55 * q) * (0.4 + 0.6 * Math.abs(Math.sin(p * 40))));
+      this.showIntent('feint', p);
     }
+  }
+
+  /** Badge over the monster's head naming the move it is winding up, and what beats it. */
+  private showIntent(kind: 'guard' | 'strike' | 'feint' | 'windup' | null, p: number): void {
+    const box = this.els.intent;
+    if (!kind) { box.className = 'a3d-intent'; box.dataset.kind = ''; return; }
+    if (box.dataset.kind !== kind) {
+      box.dataset.kind = kind;
+      const info = {
+        guard: ['checked-shield', t('Guard'), t('beat it with <b>Feint</b>')],
+        strike: ['broadsword', t('Strike'), t('beat it with <b>Guard</b>')],
+        feint: ['cloak-dagger', t('Feint'), t('beat it with <b>Strike</b>')],
+        windup: ['help', t('Strike or Feint?'), t('watch for <b class="r">red</b> or <b class="g">gold</b>')],
+      }[kind];
+      box.innerHTML = `<div class="ic">${icon(info[0])}</div><div class="tx"><b>${info[1]}</b><small>${info[2]}</small></div>`;
+      box.className = `a3d-intent on k-${kind}`;
+    }
+    const head = this.b.root.position.clone().add(new THREE.Vector3(0, Math.min(this.b.height, 2.6) + 0.35, 0)).project(this.world.camera);
+    box.style.left = `${((head.x + 1) / 2) * 100}%`;
+    box.style.top = `${Math.max(26, ((1 - head.y) / 2) * 100)}%`;
+    box.style.setProperty('--p', String(p));
   }
 
   private key(e: KeyboardEvent): void {
@@ -575,7 +615,7 @@ export class Arena3D {
     if (this.phase !== 'window' || this.locked[side]) return;
     const f = side === 'a' ? combatFighters(this.s).a : combatFighters(this.s).b;
     if (!allowedChoices(f).includes(choice)) {
-      if (!fromBot) this.pop(side, 'No stamina', 'info');
+      if (!fromBot) this.pop(side, t('No stamina'), 'info');
       return;
     }
     const p = Math.min(1, this.windowT / this.windowMs);
@@ -600,6 +640,7 @@ export class Arena3D {
     this.phase = 'impact';
     this.els.timing.classList.remove('on');
     this.els.controls.innerHTML = '';
+    this.showIntent(null, 0);
     this.world.zoomTo(1);
     const before = this.s;
     const c0 = before.combat!;
@@ -673,15 +714,15 @@ export class Arena3D {
         this.world.flash(0xffd36a, 0.35);
         this.world.zoomTo(1.25);
         this.after(420, () => this.world.zoomTo(1));
-        this.banner('Perfect', true, 1000);
+        this.banner(t('Perfect'), true, 1000);
         audio.play('chime');
       } else if (winner !== 'tie' && big > 0) {
         this.hitStop(90);
         this.world.flash(0x5a0a0a, 0.25);
-        this.banner(`${this.nameOf(winner)} wins the exchange`);
-      } else if (winner === 'tie') this.banner('Clash');
+        this.banner(t('{name} wins the exchange', { name: this.nameOf(winner) }));
+      } else if (winner === 'tie') this.banner(t('Clash'));
     });
-    for (const side of hesitated) this.pop(side, 'Hesitated - Guard', 'info');
+    for (const side of hesitated) this.pop(side, t('Hesitated - Guard'), 'info');
     this.after(1900, () => {
       this.refreshHud();
       if (this.s.combat?.over) this.over();
@@ -694,7 +735,7 @@ export class Arena3D {
   }
 
   private nameOf(side: 'a' | 'b'): string {
-    return this.knight(side)?.name ?? this.s.combat!.monster!.name;
+    return this.knight(side)?.name ?? tn(this.s.combat!.monster!.name);
   }
 
   private over(): void {
@@ -713,11 +754,11 @@ export class Arena3D {
     this.world.setCamera(new THREE.Vector3(loserSide === 'a' ? -2.4 : 2.4, 1.5, 4.6), loser.root.position.clone().add(new THREE.Vector3(0, 0.8, 0)));
     this.world.zoomTo(1.15);
     this.world.orbit = 0;
-    let t = 0;
+    let tt = 0;
     const spin = () => {
       if (this.phase !== 'over') return;
-      t += 0.016;
-      this.world.orbit = Math.sin(t * 0.6) * 0.5;
+      tt += 0.016;
+      this.world.orbit = Math.sin(tt * 0.6) * 0.5;
       requestAnimationFrame(spin);
     };
     spin();
@@ -726,7 +767,7 @@ export class Arena3D {
     const humanWon = (c.outcome === 'a' && this.human('a')) || (c.outcome === 'b' && this.human('b'));
     const humanLost = (c.outcome === 'b' && this.human('a')) || (c.outcome === 'a' && this.human('b'));
     this.after(600, () => audio.play(humanWon || !humanLost ? 'victory' : 'defeat'));
-    this.banner(`${this.nameOf(winSide)} is victorious`, false, 60000, humanLost);
+    this.banner(t('{name} is victorious', { name: this.nameOf(winSide) }), false, 60000, humanLost);
     this.drawControls();
     if (!(this.human('a') || this.human('b'))) this.after(1800, () => this.finish());
   }

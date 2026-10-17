@@ -1,4 +1,6 @@
 // Player preferences, kept in localStorage (UI only - never part of game state).
+import { setLang, type Lang } from './i18n';
+
 export interface Settings {
   /** arena3d = Three.js real-time duel, arena = 2D Phaser duel, classic = buttons */
   duelMode: 'arena3d' | 'arena' | 'classic';
@@ -10,12 +12,25 @@ export interface Settings {
   tutorial: boolean;
   /** how long the reaction window lasts in real-time duels */
   reaction: 'relaxed' | 'normal' | 'expert';
+  /** map rendering quality: auto picks low on phones */
+  graphics: 'auto' | 'high' | 'low';
+  /** interface language */
+  lang: Lang;
 }
 
 const KEY = 'moonblood.settings';
-const DEFAULTS: Settings = { v: 2, duelMode: 'arena3d', volume: 0.7, muted: false, animSpeed: 1, blood: true, tutorial: true, reaction: 'normal' };
+const DEFAULTS: Settings = { v: 2, duelMode: 'arena3d', volume: 0.7, muted: false, animSpeed: 1, blood: true, tutorial: true, reaction: 'normal', graphics: 'auto', lang: defaultLang() };
+
+function defaultLang(): Lang {
+  try {
+    return /^el\b/i.test(navigator.language) ? 'el' : 'en';
+  } catch {
+    return 'en';
+  }
+}
 
 let current: Settings = load();
+setLang(current.lang);
 
 function load(): Settings {
   try {
@@ -24,7 +39,9 @@ function load(): Settings {
       const saved = JSON.parse(raw) as Partial<Settings>;
       // v1 saves predate the 3D arena: move them to the new default once
       if (!saved.v) { saved.duelMode = 'arena3d'; saved.v = 2; }
-      return { ...DEFAULTS, ...saved };
+      const merged = { ...DEFAULTS, ...saved };
+      if (merged.lang !== 'en' && merged.lang !== 'el') merged.lang = DEFAULTS.lang;
+      return merged;
     }
   } catch {
     // storage blocked: fall back to defaults
@@ -43,6 +60,7 @@ export function getSettings(): Settings {
 
 export function updateSettings(patch: Partial<Settings>): Settings {
   current = { ...current, ...patch };
+  if (patch.lang) setLang(current.lang);
   try {
     localStorage.setItem(KEY, JSON.stringify(current));
   } catch {
@@ -55,4 +73,12 @@ export function updateSettings(patch: Partial<Settings>): Settings {
 const listeners: ((s: Settings) => void)[] = [];
 export function onSettings(l: (s: Settings) => void): void {
   listeners.push(l);
+}
+
+/** Whether to use the lighter map renderer (no ambient occlusion, smaller reflections and shadows). */
+export function lowGraphics(): boolean {
+  const q = new URLSearchParams(window.location.search).get('gfx');
+  if (q) return q === 'low';
+  if (current.graphics !== 'auto') return current.graphics === 'low';
+  return Math.min(window.innerWidth, window.innerHeight) < 600 || /Android|iPhone|iPad/i.test(navigator.userAgent);
 }

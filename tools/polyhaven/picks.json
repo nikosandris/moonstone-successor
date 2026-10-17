@@ -10,22 +10,6 @@
     "night": "moonlit_golf"
   },
   "models": {
-    "fir": {
-      "id": "fir_tree_01",
-      "tris": 6000
-    },
-    "fir_small": {
-      "id": "fir_sapling_medium",
-      "tris": 3000
-    },
-    "tree": {
-      "id": "tree_small_02",
-      "tris": 6000
-    },
-    "tree2": {
-      "id": "island_tree_01",
-      "tris": 6000
-    },
     "rocks_a": {
       "id": "rock_moss_set_01",
       "tris": 4000
@@ -33,10 +17,6 @@
     "rocks_b": {
       "id": "rock_moss_set_02",
       "tris": 4000
-    },
-    "boulder": {
-      "id": "boulder_01",
-      "tris": 3000
     },
     "cliff": {
       "id": "namaqualand_cliff_02",
@@ -69,14 +49,6 @@
     "fort": {
       "id": "modular_fort_01",
       "tris": 12000
-    },
-    "fern": {
-      "id": "fern_02",
-      "tris": 2000
-    },
-    "grass": {
-      "id": "grass_medium_01",
-      "tris": 2500
     }
   }
 }

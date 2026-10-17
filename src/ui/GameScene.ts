@@ -19,7 +19,10 @@ import { generateTextures } from './art/textures';
 import { audio } from './audio';
 import { Arena3D } from './arena3d/Arena3D';
 import { is3dReady, preload3d, preloadAllSf, webgl2Available } from './arena3d/assets3d';
-import { showSettings } from './overlays';
+import { loadMapAssets } from './map3d/mapAssets';
+import { MapWorld3D } from './map3d/MapWorld3D';
+import { getLang, t, td, tlog, tn } from './i18n';
+import { showRules, showSettings } from './overlays';
 import { MapHud, type TutorialStep } from './hud/MapHud';
 import { saveGame } from './save';
 import { getSettings, onSettings, updateSettings } from './settings';
@@ -39,13 +42,18 @@ const MAP_Y = 22;
 const mx = (x: number) => MAP_X + x * MAP_SCALE;
 const my = (y: number) => MAP_Y + y * MAP_SCALE;
 
-const PANEL_X = 700;
 
 const CHOICE_INFO: Record<Choice, { label: string; beats: string }> = {
   strike: { label: 'Strike', beats: 'beats Feint' },
   guard: { label: 'Guard', beats: 'beats Strike' },
   feint: { label: 'Feint', beats: 'beats Guard' },
 };
+
+/** All caps for banners; Greek capitals carry no accents. */
+function upper(text: string): string {
+  const u = text.toUpperCase();
+  return getLang() === 'el' ? u.normalize('NFD').replace(/\u0301/g, '').normalize('NFC') : u;
+}
 
 type DuelPhase = 'coverA' | 'pickA' | 'coverB' | 'pickB' | 'reveal';
 
@@ -69,6 +77,9 @@ export class GameScene extends Phaser.Scene {
   private justRolled = false;
   private tutStep = -1;
   private hud!: MapHud;
+  /** the 3D diorama board; null until its models load, or when WebGL2 is unavailable (2D map then) */
+  private map3d: MapWorld3D | null = null;
+  private tutSteps: TutorialStep[] | null = null;
 
   // hot-seat duel flow (choices stay in memory until the reveal)
   private duelKey = '';
@@ -108,23 +119,35 @@ export class GameScene extends Phaser.Scene {
     onSettings(() => this.applySpeed());
     // load the 3D arena models in the background; fights use the 2D arena until they are ready
     if (webgl2Available()) {
-      preload3d().then(() => preloadAllSf(), (e) => console.warn('3D assets failed to load, using the 2D arena', e));
+      const core = preload3d();
+      core.then(() => preloadAllSf(), (e) => console.warn('3D assets failed to load, using the 2D arena', e));
+      const veil = document.createElement('div');
+      veil.className = 'm3d-loading';
+      veil.innerHTML = '<div class="m3d-ltitle">Moonblood</div><div class="m3d-lsub">The realm takes shape&hellip;</div><div class="m3d-lbar"><i></i></div>';
+      document.body.appendChild(veil);
+      const bar = veil.querySelector('i') as HTMLElement;
+      const done = () => { veil.classList.add('out'); window.setTimeout(() => veil.remove(), 700); };
+      this.events.once('shutdown', () => veil.remove());
+      Promise.all([core, loadMapAssets((f) => { bar.style.width = `${Math.round(f * 100)}%`; })])
+        .then(() => { this.openMap3d(); done(); }, (e) => { console.warn('3D map failed to load, using the 2D map', e); done(); });
     }
-    this.events.once('shutdown', () => Arena3D.closeCurrent());
-    this.events.once('destroy', () => Arena3D.closeCurrent());
+    const cleanup = () => { Arena3D.closeCurrent(); this.map3d?.dispose(); this.map3d = null; };
+    this.events.once('shutdown', cleanup);
+    this.events.once('destroy', cleanup);
     // keyboard: Space/Enter rolls the die or ends the turn
     this.input.keyboard?.on('keydown', (e: KeyboardEvent) => {
       if (e.key !== ' ' && e.key !== 'Enter') return;
       const s = this.state;
-      if (this.actor.bot || this.tutStep >= 0 && this.tutStep < 3) return;
+      if (this.actor.bot || (this.tutorialStep() && !this.tutorialStep()!.step.wait)) return;
       if (s.stage === 'roll') this.dispatch({ type: 'roll' });
       else if (s.stage === 'turnEnd') this.dispatch({ type: 'endTurn' });
     });
     this.lastPos = this.state.players.map((p) => p.pos);
     this.hud = new MapHud({
-      canvas: () => this.game.canvas,
       dispatch: (a) => this.dispatch(a),
       onMenu: () => showSettings({ inGame: true, onQuit: () => this.onExit(), onChange: () => this.render() }),
+      onHelp: () => showRules(),
+      nodeScreen: (id) => this.map3d?.screenOf(id, 1) ?? null,
       onToggleSound: () => { updateSettings({ muted: !getSettings().muted }); this.render(); },
       onExit: () => this.onExit(),
       onTutorial: (step) => { this.tutStep = step; this.render(); },
@@ -194,13 +217,13 @@ export class GameScene extends Phaser.Scene {
     const p1 = phaseForDay(s.day);
     if (p0 !== p1 && s.stage !== 'gameOver') {
       if (p1 === 'full') this.sanctumCinematic();
-      else this.phaseBanner(PHASE_NAMES[p1]);
+      else this.phaseBanner(tn(PHASE_NAMES[p1]));
     }
   }
 
   private phaseBanner(text: string): void {
     audio.play('chime');
-    const t = this.add.text(347, 60, text.toUpperCase(), { fontFamily: SERIF, fontSize: '34px', fontStyle: 'bold', color: '#e8d6a8', stroke: '#000000', strokeThickness: 6, resolution: 2 }).setOrigin(0.5).setDepth(150).setAlpha(0);
+    const t = this.add.text(347, 60, upper(text), { fontFamily: SERIF, fontSize: '34px', fontStyle: 'bold', color: '#e8d6a8', stroke: '#000000', strokeThickness: 6, resolution: 2 }).setOrigin(0.5).setDepth(150).setAlpha(0);
     this.tweens.add({ targets: t, alpha: 1, y: 80, duration: 500, yoyo: true, hold: 1400, onComplete: () => t.destroy() });
   }
 
@@ -211,8 +234,8 @@ export class GameScene extends Phaser.Scene {
     const dark = this.add.rectangle(0, 0, W, H, 0x000000, 1).setOrigin(0, 0).setAlpha(0);
     const glow = this.add.image(W / 2, 250, 'glow').setTint(0xfff0c0).setBlendMode(Phaser.BlendModes.ADD).setScale(1).setAlpha(0);
     const moon = this.add.image(W / 2, 330, 'moon-full').setScale(0.4).setAlpha(0);
-    const t1 = this.add.text(W / 2, 430, 'THE FULL MOON RISES', { fontFamily: SERIF, fontSize: '40px', fontStyle: 'bold', color: '#ffe3a0', stroke: '#000', strokeThickness: 6, resolution: 2 }).setOrigin(0.5).setAlpha(0);
-    const t2 = this.add.text(W / 2, 480, 'The Sanctum stands open. Bring three Seals.', { fontFamily: SERIF, fontSize: '22px', color: '#e8d6a8', resolution: 2 }).setOrigin(0.5).setAlpha(0);
+    const t1 = this.add.text(W / 2, 430, upper(t('THE FULL MOON RISES')), { fontFamily: SERIF, fontSize: '40px', fontStyle: 'bold', color: '#ffe3a0', stroke: '#000', strokeThickness: 6, resolution: 2 }).setOrigin(0.5).setAlpha(0);
+    const t2 = this.add.text(W / 2, 480, t('The Sanctum stands open. Bring three Seals.'), { fontFamily: SERIF, fontSize: '22px', color: '#e8d6a8', resolution: 2 }).setOrigin(0.5).setAlpha(0);
     c.add([dark, glow, moon, t1, t2]);
     this.tweens.add({ targets: dark, alpha: 0.88, duration: 500 });
     this.tweens.add({ targets: moon, alpha: 1, y: 250, scale: 1.5, duration: 1800, ease: 'Sine.easeOut', delay: 300 });
@@ -223,12 +246,51 @@ export class GameScene extends Phaser.Scene {
   }
 
   private flash(msg: string): void {
-    this.toastText.setText(msg).setVisible(true);
+    this.toastText.setText(t(msg)).setVisible(true);
     this.time.delayedCall(1800, () => this.toastText.setVisible(false));
   }
 
   private get actor(): Knight {
     return this.state.players[actorId(this.state)];
+  }
+
+  private openMap3d(): void {
+    if (!this.sys || !this.sys.isActive() || this.map3d) return;
+    try {
+      this.map3d = new MapWorld3D({
+        onNodeClick: (id) => this.onNodeTap(id),
+        onNodeHover: (id) => { this.hud.setTooltip(id === null ? null : this.nodeTip(id)); },
+      });
+    } catch (e) {
+      console.warn('3D map unavailable, using the 2D map', e);
+      return;
+    }
+    this.render();
+  }
+
+  /** The places the human may move to right now. */
+  private reachNow(): Set<number> {
+    const s = this.state;
+    return s.stage === 'move' && !this.actor.bot ? new Set(reachable(s.players[s.current].pos, s.moveRoll)) : new Set<number>();
+  }
+
+  private onNodeTap(id: number): void {
+    if (this.reachNow().has(id)) {
+      this.hud.setTooltip(null);
+      this.dispatch({ type: 'move', to: id });
+      return;
+    }
+    this.infoNode = id;
+    this.hud.setTooltip(this.nodeTip(id));
+  }
+
+  /** Tooltip content for a place: what it is and what stopping there does. */
+  private nodeTip(id: number): { node: number; title: string; kind: string; text: string; reach: boolean; screen: { x: number; y: number } | null } {
+    const n = BOARD.nodes[id];
+    const kind = n.type === 'home' ? tn('Keep') : n.type === 'sanctum' ? t(isSanctumOpen(this.state.day) ? 'Open' : 'Sealed') : tn(NODE_LABEL[n.type]);
+    const owner = this.state.players.find((p) => p.seat === n.seat)?.name;
+    const title = n.type === 'home' ? (owner ? t("{name}'s Keep", { name: owner }) : t('Empty Keep')) : tn(n.name);
+    return { node: id, title, kind, text: this.nodeInfo(n), reach: this.reachNow().has(id), screen: this.map3d?.screenOf(id, n.type === 'road' ? 1 : 2) ?? null };
   }
 
   private render(): void {
@@ -238,10 +300,17 @@ export class GameScene extends Phaser.Scene {
     this.nodesLayer.removeAll(true);
     this.uiLayer.removeAll(true);
     this.modalLayer.removeAll(true);
-    this.infoText.setText(this.infoNode !== null ? this.nodeInfo(BOARD.nodes[this.infoNode]) : 'Tap any node for details.');
+    this.infoText.setText(this.infoNode !== null ? this.nodeInfo(BOARD.nodes[this.infoNode]) : t('Tap any node for details.'));
 
-    this.drawNodes();
     const s = this.state;
+    if (this.map3d) {
+      this.map3d.update({ state: s, reach: this.reachNow() });
+      // every fight covers the board; the Phaser canvas is only needed for the 2D and classic fights
+      this.map3d.setPaused(s.stage === 'combat');
+      this.game.canvas.style.visibility = s.stage === 'combat' && this.realtimeMode() !== 'arena3d' ? 'visible' : 'hidden';
+    } else {
+      this.drawNodes();
+    }
     const arena = s.stage === 'combat' && this.realtimeMode() !== 'classic';
     this.syncArena(arena);
     if (s.stage === 'combat' && !arena) this.drawCombat();
@@ -468,20 +537,20 @@ export class GameScene extends Phaser.Scene {
   private nodeInfo(n: BoardNode): string {
     const s = this.state;
     switch (n.type) {
-      case 'home': return `${n.name}: free full heal for its knight.`;
-      case 'road': return `${n.name}: nothing here but dust.`;
-      case 'village': return `${n.name} (Village): shop and healing for gold.`;
+      case 'home': return t('{name}: free full heal for its knight.', { name: tn(n.name) });
+      case 'road': return t('{name}: nothing here but dust.', { name: tn(n.name) });
+      case 'village': return t('{name} (Village): shop and healing for gold.', { name: tn(n.name) });
       case 'lair': {
         const m = getMonster(n.monster!);
         const aff = affinityText(m.id, s.day);
-        return `${n.name} (Lair): ${m.name} guards Seal ${n.seal! + 1}. ${m.hint}${aff ? ` ${aff}.` : ''}`;
+        return t('{name} (Lair): {monster} guards Seal {n}.', { name: tn(n.name), monster: tn(m.name), n: n.seal! + 1 }) + ` ${td(m.hint)}${aff ? ` ${tlog(aff)}.` : ''}`;
       }
       case 'ruins': {
         const ready = s.day >= (s.ruinsReady[n.id] ?? 0);
-        return `${n.name} (Ruins): loot, gold or a trap. ${ready ? 'Unexplored.' : `Picked clean until day ${s.ruinsReady[n.id]}.`}`;
+        return t('{name} (Ruins): loot, gold or a trap.', { name: tn(n.name) }) + ' ' + (ready ? t('Unexplored.') : t('Picked clean until day {n}.', { n: s.ruinsReady[n.id] }));
       }
       case 'sanctum':
-        return `The Sanctum: opens under the Full moon. Enter with ${CONFIG.sealsToEnter}+ Seals and beat the Warden to win.`;
+        return t('The Sanctum: opens under the Full moon. Enter with {n}+ Seals and beat the Warden to win.', { n: CONFIG.sealsToEnter });
     }
   }
 
@@ -498,25 +567,38 @@ export class GameScene extends Phaser.Scene {
     if (this.tutStep < 0 || s.stage === 'gameOver') return null;
     const me = s.players[s.current];
     if (me.bot) return null;
+    if (!this.tutSteps) this.tutSteps = this.buildTutorial();
+    const steps = this.tutSteps;
     // steps that wait for an action advance by themselves
-    if (this.tutStep === 3 && s.stage !== 'roll') this.tutStep = 4;
-    if (this.tutStep === 4 && s.stage !== 'move' && s.stage !== 'roll') this.tutStep = 5;
+    if (steps[this.tutStep]?.target === 'dock' && s.stage !== 'roll') this.tutStep++;
+    if (steps[this.tutStep]?.target === 'map' && s.stage !== 'move' && s.stage !== 'roll') this.tutStep++;
     if (s.stage === 'combat' && this.realtimeMode() !== 'classic') return null;
-    const home = BOARD.nodes[me.pos];
-    const steps: TutorialStep[] = [
-      { rect: [mx(home.x) - 40, my(home.y) - 60, 80, 90], text: `Welcome, ${me.name}! This is your knight, standing at your Home. Home heals you fully whenever you stop there.` },
-      { rect: [PANEL_X - 6, 4, W - PANEL_X + 2, 104], text: 'The moon rules the hunt. Monsters are weak at New moon and strong at Full moon - and the Sanctum in the centre opens ONLY under the Full moon (days 9-12 and 25-28).' },
-      { rect: [PANEL_X - 6, 108, W - PANEL_X + 2, 300], text: 'Your knight: health, Attack and Defense, gold, gear, items, the four Seals and any scars. You need 3 Seals to face the Sanctum guardian.' },
-      { rect: [432, 436, 258, 136], text: 'Roll the die to begin your move.', wait: true },
-      { rect: [4, 18, 686, 412], text: 'Glowing places are within reach. Lairs (red eyes) guard Seals, Villages sell gear and healing, Ruins hide loot or traps, Roads bring events. Tap one to move there.', wait: true },
-      { rect: [432, 436, 258, 136], text: 'Fights: watch the monster wind up - a blue ward means Guard, a red glow Strike, a flickering gold glint Feint - and answer with the move that beats it. Rules and settings are always under Menu. Good hunting!' },
-    ];
     if (this.tutStep >= steps.length) {
       this.tutStep = -1;
       updateSettings({ tutorial: false });
       return null;
     }
     return { step: steps[this.tutStep], total: steps.length };
+  }
+
+  /** The first-turn walkthrough, built once from where the first human knight starts. */
+  private buildTutorial(): TutorialStep[] {
+    const s = this.state;
+    const me = s.players[s.current];
+    const village = BOARD.nodes.find((n) => n.type === 'village' && reachable(me.pos, 2).includes(n.id));
+    const lair = BOARD.nodes.find((n) => n.type === 'lair' && reachable(me.pos, 3).includes(n.id));
+    const steps: TutorialStep[] = [
+      { target: `node:${me.pos}`, title: t('Welcome'), text: t('<b>{name}</b>, this is your knight at your Keep. Stopping at your own Keep heals you fully.', { name: me.name }) },
+      { target: 'hero', title: t('Your knight'), text: t('<b>Health</b>, <b>Attack</b> (added to your blows), <b>Defense</b> (taken off blows you suffer), <b>Stamina</b> and <b>gold</b>. Below: your gear, potions and the four <b>Seals</b>.') },
+      { target: 'moon', title: t('How to win'), text: t('Take <b>{n} Seals</b> from the monster lairs, then reach the <b>Sanctum</b> in the middle while the <b>Full moon</b> is up and defeat its guardian. The moon also makes monsters weaker (New) or stronger (Full).', { n: CONFIG.sealsToEnter }) },
+      ...(lair ? [{ target: `node:${lair.id}`, title: t('Lairs'), text: t('Each lair holds a monster and the Seal floating above it. Win the fight to take the Seal. The colour of the gem shows which Seal it is.') }] : []),
+      ...(village ? [{ target: `node:${village.id}`, title: t('Villages'), text: t('Villages sell better weapons, armour and potions, and heal you for gold. Ruins hide loot (or traps); roads bring random events.') }] : []),
+      { target: 'roster', title: t('Rivals'), text: t('Everyone moves in this order; it is re-rolled each dawn. Stop on a rival to duel them for a Seal or half their gold.') },
+      { target: 'dock', title: t('Your move'), text: t('Roll the die to begin.'), wait: true },
+      { target: 'map', title: t('Choose a place'), text: t('Glowing places are within reach. Hover or tap any place to see what it does; tap a glowing one to travel there.'), wait: true },
+      { target: 'help', title: t('Fights'), text: t('In a fight you and the monster each pick <b>Strike</b>, <b>Guard</b> or <b>Feint</b>: Strike beats Feint, Feint beats Guard, Guard beats Strike. The monster shows its move a moment early; the fight screen explains it. The <b>?</b> button explains everything again.') },
+    ];
+    return steps;
   }
 
   // ------------------------------------------------------------ modals

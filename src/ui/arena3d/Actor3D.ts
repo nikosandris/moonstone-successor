@@ -29,7 +29,7 @@ const SLOT_R = THREE.PropertyBinding.sanitizeNodeName('handslot.r');
 const SLOT_L = THREE.PropertyBinding.sanitizeNodeName('handslot.l');
 
 /** What the arena asks for (KayKit clip names) mapped to a move category. */
-type Move = 'idle' | 'attack' | 'attack2' | 'block' | 'hit' | 'death' | 'roar';
+type Move = 'idle' | 'attack' | 'attack2' | 'block' | 'hit' | 'death' | 'roar' | 'walk';
 const KAY_MOVE: Record<string, Move> = {
   Idle_Combat: 'idle', Idle: 'idle',
   '1H_Melee_Attack_Chop': 'attack', '1H_Melee_Attack_Slice_Horizontal': 'attack2',
@@ -37,6 +37,7 @@ const KAY_MOVE: Record<string, Move> = {
   Hit_A: 'hit', Hit_B: 'hit',
   Death_A: 'death', Death_B: 'death',
   Spawn_Ground: 'roar', Taunt: 'roar', Cheer: 'roar',
+  Walk: 'walk',
 };
 
 interface SfTune {
@@ -68,8 +69,8 @@ interface SfTune {
 }
 
 export const SF_TUNE: Record<SfFile, SfTune> = {
-  knight: { size: 1.85, by: 'height', yaw: Math.PI, clips: { idle: 'FIGHTIDLE_Root' }, tintMat: /cloth|plume/i, weapon: 'w_skeleton_blade', sfWeapon: 'sword', grip: { dir: [0, 1, 0], len: 1.05 }, hand: /R_Hand/ },
-  rustKnight: { size: 1.9, by: 'height', clips: { idle: 'Idle' }, weapon: 'w_skeleton_axe', sfWeapon: 'axe', grip: { dir: [0, 1, 0], len: 0.85 }, hand: /RightHand/ },
+  knight: { size: 1.85, by: 'height', yaw: Math.PI, clips: { idle: 'FIGHTIDLE_Root', walk: 'WALK_player_Root' }, tintMat: /cloth|plume/i, weapon: 'w_skeleton_blade', sfWeapon: 'sword', grip: { dir: [0, 1, 0], len: 1.05 }, hand: /R_Hand/ },
+  rustKnight: { size: 1.9, by: 'height', clips: { idle: 'Idle', walk: 'Walk' }, weapon: 'w_skeleton_axe', sfWeapon: 'axe', grip: { dir: [0, 1, 0], len: 0.85 }, hand: /RightHand/ },
   direWolf: { size: 2.4, by: 'length', yaw: -Math.PI / 2, clips: { idle: 'metarig.002|IDLE', roar: 'metarig.002|RRAR', attack: 'metarig.002|RRAR' } },
   bogTroll: { size: 2.6, by: 'height', clips: { idle: 'idle', attack: 'attack1', attack2: 'attack2', hit: 'take_damage', death: 'death', roar: 'attack2' }, sway: 0.6 },
   caveDrake: { size: 3.4, by: 'length', clips: { idle: 'Idle Stand' }, sway: 0.5 },
@@ -133,6 +134,7 @@ export class Actor3D {
   private handR: THREE.Object3D | null = null;
   private chestBone: THREE.Object3D | null = null;
   private glowLight: THREE.PointLight;
+  private aura: THREE.Mesh;
   readonly height: number;
   /** half the body's depth along its facing, for spacing and lunges */
   reach = 0.4;
@@ -190,9 +192,15 @@ export class Actor3D {
     if (sf) this.attachSfWeapon();
     else this.setupHeldItems(look);
 
-    this.glowLight = new THREE.PointLight(0xffffff, 0, 3.5, 2);
-    this.glowLight.position.set(0, this.height * 0.8, 0.6);
+    this.glowLight = new THREE.PointLight(0xffffff, 0, Math.max(3.5, this.height * 2.2), 2);
+    this.glowLight.position.set(0, this.height * 0.75, Math.max(0.6, this.reach * 0.8));
     this.root.add(this.glowLight);
+    // telegraph aura on the ground under the fighter
+    const r = Math.max(0.6, this.reach * 1.1);
+    this.aura = new THREE.Mesh(new THREE.RingGeometry(r * 0.55, r, 48), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+    this.aura.rotation.x = -Math.PI / 2;
+    this.aura.position.y = 0.03;
+    this.root.add(this.aura);
 
     this.play('Idle_Combat', { fade: 0 });
   }
@@ -303,7 +311,10 @@ export class Actor3D {
       const move = this.moveFor(name) ?? 'idle';
       next = this.sfClip(move);
       this.startProc(move, !!next);
-      if (!next || move === 'idle') {
+      if (move === 'walk' && next) {
+        loop = true;
+        this.procState = null;
+      } else if (!next || move === 'idle') {
         next = this.sfClip('idle') ?? [...this.actions.values()][0];
         speed = this.tune.idleSpeed ?? 1;
         loop = true;
@@ -343,7 +354,9 @@ export class Actor3D {
         clip.paused = true;
         clip.time = frac * clip.getClip().duration;
       } else if (this.current !== this.sfClip('idle')) this.play('Idle_Combat', { fade });
-      this.procState = { move, t: 0, dur: Infinity, frac };
+      const held = this.procState;
+      if (held && held.move === move && held.dur === Infinity) held.frac = frac;
+      else this.procState = { move, t: 0, dur: Infinity, frac };
       return;
     }
     const a = this.actions.get(name);
@@ -355,7 +368,7 @@ export class Actor3D {
 
   /** Begin a procedural accent for a move; when the model has a real clip only a light accent is added. */
   private startProc(move: Move, hasClip: boolean): void {
-    if (move === 'idle') { this.procState = null; return; }
+    if (move === 'idle' || move === 'walk') { this.procState = null; return; }
     if (move === 'death') this.deathSide = Math.random() < 0.5 ? 1 : -1;
     const dur = move === 'death' ? Infinity : move === 'roar' ? 1.4 : move === 'hit' ? 0.5 : 0.7;
     this.procState = { move, t: 0, dur, frac: hasClip ? -1 : undefined };
@@ -373,8 +386,11 @@ export class Actor3D {
       if (st.dur === Infinity && st.move !== 'death') {
         // held wind-up pose
         const f = st.frac ?? 0;
-        if (st.move === 'block') { pitch = -0.14 * f; dy = -0.06 * f; sc = 1 - 0.03 * f; }
-        else if (st.move === 'attack' || st.move === 'attack2') { pitch = -0.22 * f; dz = -0.12 * f; sc = 1 + 0.04 * f; }
+        // with no clip for the move, the whole body shows it (with a clip, a lighter accent on top)
+        const m = this.sfClip(st.move) ? 0.45 : 1;
+        if (st.move === 'block') { pitch = -0.3 * f * m; dy = -0.1 * f * m; dz = -0.18 * f * m; sc = 1 - 0.05 * f * m; }
+        else if (st.move === 'attack') { pitch = -0.45 * f * m; dz = -0.3 * f * m; dy = 0.06 * f * m; sc = 1 + 0.08 * f * m; }
+        else if (st.move === 'attack2') { pitch = -0.3 * f * m; dz = -0.2 * f * m; roll = Math.sin(st.t * 16) * 0.16 * Math.min(1, f * 3) * m; sc = 1 + 0.05 * f * m; }
       } else if (st.move === 'attack' || st.move === 'attack2') {
         // snap forward then settle
         const a = u < 0.3 ? u / 0.3 : Math.max(0, 1 - (u - 0.3) / 0.7);
@@ -414,12 +430,17 @@ export class Actor3D {
 
   /** Coloured glow for telegraphs: emissive tint + a small light at the fighter. */
   setGlow(color: number, amount: number): void {
+    // textured realistic models need a much stronger emissive push to read in a dark lair
+    const k = this.tune ? 0.6 : 0.18;
     for (const m of this.materials) {
       m.emissive.setHex(color);
-      m.emissiveIntensity = amount * 0.18;
+      m.emissiveIntensity = amount * k;
     }
     this.glowLight.color.setHex(color);
-    this.glowLight.intensity = amount * 9;
+    this.glowLight.intensity = amount * (this.tune ? 22 : 9);
+    const am = this.aura.material as THREE.MeshBasicMaterial;
+    am.color.setHex(color);
+    am.opacity = Math.min(0.9, amount * 0.85);
   }
 
   flash(): void {

@@ -7,6 +7,15 @@ import '@fontsource/cinzel-decorative/900.css';
 import '@fontsource/spectral/400.css';
 import '@fontsource/spectral/400-italic.css';
 import '@fontsource/spectral/600.css';
+import '@fontsource/cormorant-garamond/500-italic.css';
+import '@fontsource/cormorant-garamond/600.css';
+import '@fontsource/cormorant-garamond/600-italic.css';
+import '@fontsource/cormorant-garamond/700.css';
+// Greek glyphs (Cinzel, Spectral and Cormorant have none): the browser falls back to EB Garamond per glyph
+import '@fontsource/eb-garamond/greek-500.css';
+import '@fontsource/eb-garamond/greek-600.css';
+import '@fontsource/eb-garamond/greek-700.css';
+import '@fontsource/eb-garamond/greek-500-italic.css';
 import './ui/hud/hud.css';
 import { ArenaScene } from './ui/arena/ArenaScene';
 import { GameScene } from './ui/GameScene';

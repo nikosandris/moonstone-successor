@@ -9,6 +9,7 @@ const WANT = [
   'wolf-head', 'troll', 'dragon-head', 'spider-face', 'snake', 'golem-head', 'hooded-assassin', 'spectre', 'visored-helm', 'moon',
   'skull-crossed-bones', 'potion-ball', 'run', 'castle', 'death-skull', 'bandit', 'scythe', 'swords-emblem', 'winged-sword',
   'two-coins', 'scroll-unfurled', 'dice-six-faces-six', 'shop', 'campfire', 'crystal-ball', 'trophy-cup', 'sun', 'sands-of-time',
+  'help', 'open-book', 'tombstone', 'village', 'cave-entrance', 'footsteps', 'cycle', 'magnifying-glass', 'heart-plus', 'info', 'stone-tower', 'dodge',
 ];
 const lines = WANT.map((n) => {
   const icon = set.icons[n];
