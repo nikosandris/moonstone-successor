@@ -8,7 +8,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
-import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
+import type { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
 import { Water } from 'three/addons/objects/Water.js';
 import { shortestPath } from '../../core/graph';
 import { isSanctumOpen, phaseForDay } from '../../core/moon';
@@ -19,6 +19,7 @@ import { Actor3D } from '../arena3d/Actor3D';
 import { MONSTER_LOOK } from '../arena3d/Arena3D';
 import { sfReady } from '../arena3d/assets3d';
 import { getLang, t, tn } from '../i18n';
+import { FrameGovernor, makeAO } from '../gfx';
 import { lowGraphics } from '../settings';
 import { SEAL_COLORS } from '../theme';
 import { ModelScatter, mapEnv, mapTexture, placeModel, type MapModel } from './mapAssets';
@@ -148,6 +149,7 @@ export class MapWorld3D {
   private composer: EffectComposer;
   private final: ShaderPass;
   private gtao: GTAOPass | null = null;
+  private governor!: FrameGovernor;
   private scene = new THREE.Scene();
   private camera = new THREE.PerspectiveCamera(32, 16 / 9, 0.5, 400);
   private key = new THREE.DirectionalLight(0xffffff, 2);
@@ -193,7 +195,6 @@ export class MapWorld3D {
     this.root.append(this.canvas, this.labels);
     this.mobile = lowGraphics();
     this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: false, powerPreference: 'high-performance' });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, this.mobile ? 1.5 : 2));
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -210,19 +211,7 @@ export class MapWorld3D {
     this.composer = new EffectComposer(this.renderer);
     this.composer.addPass(new RenderPass(this.scene, this.camera));
     if (!this.mobile) {
-      this.gtao = new GTAOPass(this.scene, this.camera, 512, 512);
-      this.gtao.blendIntensity = 0.9;
-      this.gtao.updateGtaoMaterial({ radius: 0.6, distanceExponent: 1.4, thickness: 1.2, scale: 1 });
-      // glow sprites, light beams and rings are not surfaces: keep them out of the occlusion pass
-      // (otherwise each one shades a dark rectangle around itself)
-      const g = this.gtao as unknown as { _overrideVisibility: () => void; _visibilityCache: THREE.Object3D[]; scene: THREE.Scene };
-      g._overrideVisibility = () => {
-        g.scene.traverse((o) => {
-          const m = (o as THREE.Mesh).material as THREE.Material | undefined;
-          const skip = (o as THREE.Sprite).isSprite || (o as THREE.Points).isPoints || (o as THREE.Line).isLine || (m && (m.transparent || !m.visible || (m as THREE.ShaderMaterial).isShaderMaterial));
-          if (skip && o.visible && o !== this.water) { o.visible = false; g._visibilityCache.push(o); }
-        });
-      };
+      this.gtao = makeAO(this.scene, this.camera);
       this.composer.addPass(this.gtao);
     }
     this.composer.addPass(new UnrealBloomPass(new THREE.Vector2(512, 512), 0.5, 0.55, 0.85));
@@ -246,7 +235,9 @@ export class MapWorld3D {
     window.addEventListener('resize', this.onResize);
     document.body.appendChild(this.root);
     (window as unknown as { __map3d?: MapWorld3D }).__map3d = this; // test hook
-    (window as unknown as { __map3dInfo?: () => unknown }).__map3dInfo = () => ({ ...this.renderer.info.render });
+    (window as unknown as { __map3dInfo?: () => unknown }).__map3dInfo = () => ({ ...this.renderer.info.render, ratio: this.governor.pixelRatio });
+    this.governor = new FrameGovernor(this.renderer, this.composer, this.mobile ? 1.5 : 2, () => this.resize());
+    if (this.gtao) this.governor.addOptional(this.gtao);
     this.resize();
     this.loop();
   }
@@ -869,6 +860,7 @@ export class MapWorld3D {
   }
 
   private resize(): void {
+    if (!this.final) return;
     const w = window.innerWidth, h = window.innerHeight;
     this.renderer.setSize(w, h, false);
     this.composer.setSize(w, h);
@@ -882,7 +874,9 @@ export class MapWorld3D {
   private loop = () => {
     this.raf = requestAnimationFrame(this.loop);
     if (this.paused) return;
-    const dt = Math.min(0.05, this.clock.getDelta());
+    const raw = this.clock.getDelta();
+    this.governor.tick(raw);
+    const dt = Math.min(0.05, raw);
     this.time += dt;
     const t = this.time;
     const k = 1 - Math.exp(-dt * 4);

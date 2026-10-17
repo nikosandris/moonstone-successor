@@ -255,7 +255,7 @@ export class Arena3D {
     this.tickMoves(dt);
     this.a.update(dt);
     this.b.update(dt);
-    this.world.render(dt);
+    this.world.render(dt, realDt);
     this.raf = requestAnimationFrame(this.loop);
   };
 

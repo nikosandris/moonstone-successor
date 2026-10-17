@@ -163,6 +163,18 @@ export function buildTerrain(): THREE.Mesh {
   }
   geo.setAttribute('splat', new THREE.BufferAttribute(splat, 4));
 
+  const mat = splatMaterial();
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.receiveShadow = true;
+  mesh.castShadow = true;
+  return mesh;
+}
+
+/**
+ * Ground material blending five photo-scanned layers by a per-vertex `splat` attribute
+ * (dirt, rock, moss, mud; grass fills the rest). Used by the map and the arena.
+ */
+export function splatMaterial(): THREE.MeshStandardMaterial {
   const mat = new THREE.MeshStandardMaterial({ roughness: 0.92, metalness: 0 });
   const tex = (n: string) => ({ value: mapTexture(n) });
   mat.onBeforeCompile = (sh) => {
@@ -224,8 +236,5 @@ diffuseColor.rgb = (cg * wG + cd * wD + cr * wR + cm * wM + cu * wU) * (0.82 + m
 }
 `);
   };
-  const mesh = new THREE.Mesh(geo, mat);
-  mesh.receiveShadow = true;
-  mesh.castShadow = true;
-  return mesh;
+  return mat;
 }

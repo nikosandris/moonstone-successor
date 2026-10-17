@@ -9,6 +9,10 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import type { MoonPhase } from '../../core/types';
 import { drawFog, drawMoon } from '../art/textures';
 import { cloneProp, type PropFile } from './assets3d';
+import { FrameGovernor, makeAO } from '../gfx';
+import { ModelScatter, hasModel, mapEnv, mapTexture, placeModel, type MapModel } from '../map3d/mapAssets';
+import { fbm, splatMaterial } from '../map3d/terrain';
+import { lowGraphics } from '../settings';
 import { Fx3D } from './Fx3D';
 
 export type Stage3D = 'forest' | 'lair' | 'sanctum';
@@ -78,7 +82,6 @@ export class World3D {
 
   constructor(readonly canvas: HTMLCanvasElement, stage: Stage3D, phase: MoonPhase, seed: number) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -90,14 +93,25 @@ export class World3D {
 
     this.composer = new EffectComposer(this.renderer);
     this.composer.addPass(new RenderPass(this.scene, this.camera));
+    const low = lowGraphics();
+    const ao = !low && this.realistic ? makeAO(this.scene, this.camera, 0.5) : null;
+    if (ao) this.composer.addPass(ao);
     this.bloom = new UnrealBloomPass(new THREE.Vector2(512, 288), 0.55, 0.6, 0.78);
     this.composer.addPass(this.bloom);
     this.vignette = new ShaderPass(VignetteShader);
     this.composer.addPass(this.vignette);
     this.composer.addPass(new OutputPass());
+    this.governor = new FrameGovernor(this.renderer, this.composer, low ? 1.5 : 2, () => this.resize(this.size.x, this.size.y));
+    if (ao) this.governor.addOptional(ao);
   }
 
+  private governor: FrameGovernor;
+  private size = new THREE.Vector2(1, 1);
+  /** true when the photo-real ground and props were used (the map's assets are loaded) */
+  realistic = false;
+
   resize(w: number, h: number): void {
+    this.size.set(w, h);
     this.renderer.setSize(w, h, false);
     this.composer.setSize(w, h);
     this.camera.aspect = w / h;
@@ -162,10 +176,11 @@ export class World3D {
     s.add(new THREE.HemisphereLight(0x5a6a9a, 0x1a1418, stage === 'lair' ? 0.9 : 1.0));
     // image-based light so the realistic models' metal and leather read (black otherwise)
     const pmrem = new THREE.PMREMGenerator(this.renderer);
-    this.envMap = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    const hdri = mapEnv();
+    this.envMap = hdri ? pmrem.fromEquirectangular(hdri).texture : pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
     pmrem.dispose();
     s.environment = this.envMap;
-    s.environmentIntensity = stage === 'lair' ? 0.32 : 0.4;
+    s.environmentIntensity = hdri ? (stage === 'lair' ? 0.45 : 0.75) : stage === 'lair' ? 0.32 : 0.4;
     // soft front fill so faces read against the dark
     const fill = new THREE.DirectionalLight(0xffe0c0, 0.7);
     fill.position.set(-1, 2.5, 8);
@@ -173,6 +188,16 @@ export class World3D {
     const rim = new THREE.DirectionalLight(0x6a8cff, 0.8);
     rim.position.set(-4, 3, -6);
     s.add(rim);
+
+    if (this.buildRealStage(stage, seed)) {
+      this.realistic = true;
+      // scanned materials are darker than the stylised ones: open the lighting up
+      key.intensity *= 1.4;
+      this.renderer.toneMappingExposure += 0.18;
+      s.add(new THREE.HemisphereLight(0x8090c0, 0x302418, stage === 'lair' ? 0.9 : 0.7));
+      this.buildTorches(stage, phase);
+      return;
+    }
 
     // ground
     const ground = new THREE.Mesh(
@@ -247,7 +272,12 @@ export class World3D {
       }
     }
 
-    // torches with flickering light and embers
+    this.buildTorches(stage, phase);
+  }
+
+  /** Torches with flickering light and embers, an altar glow, and drifting ground fog. */
+  private buildTorches(stage: Stage3D, phase: MoonPhase): void {
+    const s = this.scene;
     const torchSpots: [number, number][] = stage === 'lair' ? [[-3.2, -1.6], [3.2, -1.6], [0, -4.5]] : [[-3.6, -1.8], [3.6, -2.0]];
     for (const [x, z] of torchSpots) {
       const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.07, 1.6, 6), new THREE.MeshStandardMaterial({ color: 0x3a2a1a, roughness: 1 }));
@@ -286,6 +316,110 @@ export class World3D {
     }
   }
 
+  /**
+   * Photo-real stage from the map's assets: relief ground blending scanned textures, real trees, cliffs,
+   * a cave mouth for lairs and the standing stones behind a Sanctum fight. False when they are not loaded.
+   */
+  private buildRealStage(stage: Stage3D, seed: number): boolean {
+    if (!mapTexture('grass_diff') || !hasModel('pine')) return false;
+    const s = this.scene;
+    const rnd = seeded(seed);
+    const low = lowGraphics();
+    // ground with relief: a flat duelling floor, rising ground beyond; lairs are walled in by rock
+    const height = (x: number, z: number): number => {
+      const r = Math.hypot(x, z + 1);
+      const rise = Math.max(0, r - 5.5);
+      let h = rise * rise * 0.025 * (0.6 + fbm(x * 0.12, z * 0.12, 4, seed % 97) * 0.9);
+      if (stage === 'lair') h += Math.max(0, -z - 4) * 0.55 + Math.max(0, Math.abs(x) - 6) * 0.4;
+      if (z > 3) h *= 0.3; // keep the camera side low
+      return h;
+    };
+    const geo = new THREE.PlaneGeometry(90, 90, low ? 120 : 200, low ? 120 : 200);
+    geo.rotateX(-Math.PI / 2);
+    const pos = geo.getAttribute('position') as THREE.BufferAttribute;
+    for (let i = 0; i < pos.count; i++) pos.setY(i, height(pos.getX(i), pos.getZ(i)));
+    geo.computeVertexNormals();
+    const nrm = geo.getAttribute('normal') as THREE.BufferAttribute;
+    const splat = new Float32Array(pos.count * 4);
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i), z = pos.getZ(i);
+      const r = Math.hypot(x, z + 0.5);
+      const n = fbm(x * 0.5, z * 0.5, 3, 41);
+      const slope = 1 - nrm.getY(i);
+      let dirt = (1 - THREE.MathUtils.smoothstep(r, 2.2, 4.6)) * (0.55 + n * 0.6);
+      let rock = THREE.MathUtils.smoothstep(slope, 0.18, 0.45);
+      let moss = THREE.MathUtils.smoothstep(fbm(x * 0.2, z * 0.2, 4, 43), 0.45, 0.65) * 0.8;
+      let mud = 0;
+      if (stage === 'lair') { mud = dirt * 0.6; dirt *= 0.6; rock = Math.min(1, rock + 0.25 * n); moss *= 0.3; }
+      if (stage === 'sanctum') { moss = Math.max(moss, 0.4); }
+      splat.set([Math.min(1, dirt), rock, moss * (1 - dirt), mud], i * 4);
+    }
+    geo.setAttribute('splat', new THREE.BufferAttribute(splat, 4));
+    const ground = new THREE.Mesh(geo, splatMaterial());
+    ground.receiveShadow = true;
+    s.add(ground);
+
+    const props = new ModelScatter();
+    const put = (name: MapModel, size: number, x: number, z: number, rot: number, by: 'height' | 'width' = 'height', sink = 0.05) => {
+      const g = placeModel(name, size, by);
+      if (!g) return;
+      g.position.set(x, height(x, z) - sink, z);
+      g.rotation.y = rot;
+      g.userData.shared = true;
+      s.add(g);
+    };
+    const open = (x: number, z: number) => z > 2.5 && Math.abs(x) < 9; // the camera's side
+    if (stage === 'forest' || stage === 'sanctum') {
+      const n = low ? 70 : stage === 'forest' ? 150 : 90;
+      for (let i = 0; i < n; i++) {
+        const a = rnd() * Math.PI * 2;
+        const r = 7.5 + Math.pow(rnd(), 0.7) * 26;
+        const x = Math.cos(a) * r, z = Math.sin(a) * r - 2;
+        if (open(x, z)) continue;
+        const k = rnd();
+        props.add(k < 0.55 ? 'pine' : k < 0.93 ? 'spruce' : 'deadpine', x, height(x, z) - 0.05, z, 4 + rnd() * 3.5, rnd() * 6.28);
+      }
+      for (let i = 0; i < (low ? 40 : 90); i++) {
+        const a = rnd() * Math.PI * 2;
+        const r = 4.5 + rnd() * 14;
+        const x = Math.cos(a) * r, z = Math.sin(a) * r - 1;
+        if (open(x, z) && r < 8) continue;
+        props.add(rnd() < 0.5 ? 'bush' : 'ferns', x, height(x, z) - 0.03, z, 0.6 + rnd() * 0.8, rnd() * 6.28);
+      }
+    }
+    for (let i = 0; i < 16; i++) {
+      const a = rnd() * Math.PI * 2;
+      const r = 4.2 + rnd() * 8;
+      const x = Math.cos(a) * r, z = Math.sin(a) * r - 1.5;
+      if (open(x, z) && r < 6) continue;
+      props.add(rnd() < 0.5 ? 'rocks_a' : 'rocks_b', x, height(x, z) - 0.05, z, 1 + rnd() * 1.6, rnd() * 6.28, 'width');
+    }
+    if (stage === 'lair') {
+      // a wall of cliffs and the cave mouth the monster came from
+      for (let i = 0; i < 9; i++) {
+        const a = Math.PI * (0.08 + (i / 8) * 0.84);
+        const r = 8 + rnd() * 2;
+        const x = Math.cos(a) * r * 1.3, z = -Math.sin(a) * r;
+        props.add(i % 2 ? 'cliff' : 'cliff2', x, height(x, z) - 0.8, z, 7 + rnd() * 4, Math.atan2(-x, -z) + Math.PI / 2, 'width');
+      }
+      put('lairgate', 5.2, 2.6, -6.2, -0.35, 'height', 0.3);
+      put('deadtree', 3.2, -4.8, -4.2, 0.8);
+      for (const [x, z] of [[-6, -1], [6.5, -0.5], [-3, -6]] as [number, number][]) props.add('rocks_b', x, height(x, z) - 0.1, z, 2.2, rnd() * 6, 'width');
+      const ember = new THREE.PointLight(0xff4a2a, 9, 9, 1.6);
+      ember.position.set(2.6, 1.6, -5.4);
+      s.add(ember);
+    }
+    if (stage === 'sanctum') put('stonehenge', 15, 0, -10.5, 0.4, 'width', 0.2);
+    if (stage === 'forest') {
+      put('deadtree', 2.6, -5.5, -3.2, 1.2);
+      props.add('firepit', 4.6, height(4.6, -3.4), -3.4, 1.1, 0, 'width');
+    }
+    const built = props.build(!low);
+    built.userData.shared = true;
+    s.add(built);
+    return true;
+  }
+
   setCamera(base: THREE.Vector3, focus: THREE.Vector3): void {
     this.camBase.copy(base);
     this.focus.copy(focus);
@@ -305,7 +439,9 @@ export class World3D {
     this.vignette.uniforms.flash.value = amount;
   }
 
-  render(dt: number): void {
+  /** `real` is the unscaled frame time (slow motion must not look like a slow device). */
+  render(dt: number, real = dt): void {
+    this.governor?.tick(real);
     this.time += dt;
     this.fx.update(dt);
     for (const f of this.flickers) {
@@ -339,9 +475,12 @@ export class World3D {
   }
 
   dispose(): void {
+    // map models are shared with the board: only free what the arena made itself
+    const shared = new Set<THREE.Object3D>();
+    this.scene.traverse((o) => { if (o.userData.shared) o.traverse((c) => shared.add(c)); });
     this.scene.traverse((o) => {
       const m = o as THREE.Mesh;
-      if (m.geometry) m.geometry.dispose();
+      if (m.geometry && !shared.has(o) && !(o as THREE.InstancedMesh).isInstancedMesh && !(o as THREE.SkinnedMesh).isSkinnedMesh) m.geometry.dispose();
     });
     this.envMap?.dispose();
     this.composer.dispose();
