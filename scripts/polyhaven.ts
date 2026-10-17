@@ -122,8 +122,24 @@ async function fetchPicks(): Promise<void> {
   writeFileSync(join(OUT, 'CREDITS.md'), `# Poly Haven assets (CC0)\n\n${credits.join('\n')}\n`);
 }
 
+/** Dump the file listing of a few assets (to inspect how Poly Haven packages them). */
+async function probe(): Promise<void> {
+  const out: Record<string, unknown> = {};
+  for (const id of ['fir_tree_01', 'tree_small_02']) {
+    const files = await getJson(`${API}/files/${id}`);
+    const g = files.gltf?.['1k']?.gltf;
+    out[id] = { keys: Object.keys(files), gltfInclude: g ? Object.keys(g.include ?? {}) : null };
+    if (g) {
+      const json = JSON.parse(new TextDecoder().decode(await getBytes(g.url)));
+      out[`${id}_materials`] = json.materials;
+      out[`${id}_images`] = json.images;
+    }
+  }
+  writeFileSync(join(DIR, 'probe.json'), JSON.stringify(out, null, 2));
+}
+
 if (!existsSync(DIR)) mkdirSync(DIR, { recursive: true });
-(process.argv[2] === 'fetch' ? fetchPicks() : scout()).catch((e) => {
+(process.argv[2] === 'fetch' ? fetchPicks() : process.argv[2] === 'probe' ? probe() : scout()).catch((e) => {
   console.error(e);
   process.exit(1);
 });

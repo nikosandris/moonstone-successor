@@ -7,7 +7,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, wri
 import { join } from 'node:path';
 import { NodeIO } from '@gltf-transform/core';
 import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
-import { dedup, meshopt, prune, resample, textureCompress } from '@gltf-transform/functions';
+import { dedup, meshopt, metalRough, prune, resample, textureCompress } from '@gltf-transform/functions';
 import { MeshoptEncoder } from 'meshoptimizer';
 
 const API = 'https://api.sketchfab.com/v3';
@@ -140,7 +140,8 @@ async function fetchOne(role: string, uid: string, token: string, io: NodeIO, sh
     doc = await io.read(gltf);
   }
   await doc.transform(
-    dedup(), resample(), prune(),
+    // older exports use specular-glossiness, which three.js no longer reads
+    metalRough(), dedup(), resample(), prune(),
     textureCompress({ encoder: sharp, targetFormat: 'webp', resize: [1024, 1024] }),
     meshopt({ encoder: MeshoptEncoder, level: 'medium' }),
   );

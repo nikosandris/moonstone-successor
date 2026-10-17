@@ -8,7 +8,7 @@ on:
         required: true
         default: scout
         type: choice
-        options: [scout, fetch]
+        options: [scout, fetch, probe]
 
 permissions:
   contents: write
