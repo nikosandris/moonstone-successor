@@ -1,0 +1,119 @@
+// Poly Haven pipeline (CC0 textures, HDRIs, models), run by .github/workflows/polyhaven.yml on GitHub's servers.
+//   scout: list candidate assets per category with thumbnails -> tools/polyhaven/candidates.json + thumbs/
+//   fetch: download the picks in tools/polyhaven/picks.json -> public/assets/ph/
+//          textures: 1k diffuse/normal/roughness as webp; hdri: 1k .hdr; models: 1k glTF packed + compressed to .glb
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { NodeIO } from '@gltf-transform/core';
+import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
+import { dedup, meshopt, prune, textureCompress, weld } from '@gltf-transform/functions';
+import { MeshoptEncoder } from 'meshoptimizer';
+
+const API = 'https://api.polyhaven.com';
+const DIR = 'tools/polyhaven';
+const OUT = 'public/assets/ph';
+const HEADERS = { 'User-Agent': 'moonblood-asset-pipeline/1.0 (github actions)' };
+
+async function getJson(url: string): Promise<any> {
+  for (let i = 0; i < 4; i++) {
+    const res = await fetch(url, { headers: HEADERS });
+    if (res.ok) return res.json();
+    await new Promise((r) => setTimeout(r, 1500 * 2 ** i));
+  }
+  throw new Error(`failed ${url}`);
+}
+
+async function getBytes(url: string): Promise<Uint8Array<ArrayBuffer>> {
+  for (let i = 0; i < 4; i++) {
+    const res = await fetch(url, { headers: HEADERS });
+    if (res.ok) return new Uint8Array(await res.arrayBuffer());
+    await new Promise((r) => setTimeout(r, 1500 * 2 ** i));
+  }
+  throw new Error(`failed ${url}`);
+}
+
+/** [group, asset type, required tag/category words (any)] */
+const SCOUT: [string, string, string[]][] = [
+  ['ground', 'textures', ['grass', 'forest ground', 'forrest', 'leaves', 'moss']],
+  ['dirt', 'textures', ['dirt', 'mud', 'soil', 'path', 'gravel']],
+  ['rock', 'textures', ['rock', 'cliff', 'stone']],
+  ['hdri', 'hdris', ['night', 'moon', 'dusk']],
+  ['trees', 'models', ['tree', 'pine', 'fir', 'shrub', 'bush']],
+  ['rocks', 'models', ['rock', 'boulder', 'stone']],
+  ['props', 'models', ['barrel', 'crate', 'lantern', 'cart', 'fence', 'ruin', 'wall', 'stump', 'log']],
+];
+
+async function scout(): Promise<void> {
+  mkdirSync(join(DIR, 'thumbs'), { recursive: true });
+  const out: Record<string, { id: string; name: string; tags: string[]; downloads: number }[]> = {};
+  for (const [group, type, words] of SCOUT) {
+    const all = await getJson(`${API}/assets?t=${type}`) as Record<string, any>;
+    const hits = Object.entries(all)
+      .filter(([id, a]) => {
+        const hay = `${id} ${a.name} ${(a.tags ?? []).join(' ')} ${(a.categories ?? []).join(' ')}`.toLowerCase();
+        return words.some((w) => hay.includes(w));
+      })
+      .map(([id, a]) => ({ id, name: a.name as string, tags: (a.tags ?? []) as string[], downloads: (a.download_count ?? 0) as number }))
+      .sort((a, b) => b.downloads - a.downloads)
+      .slice(0, group === 'props' ? 24 : 16);
+    for (const [i, h] of hits.entries()) {
+      try {
+        writeFileSync(join(DIR, 'thumbs', `${group}_${i}_${h.id}.png`), await getBytes(`https://cdn.polyhaven.com/asset_img/thumbs/${h.id}.png?width=256&height=256`));
+      } catch (e) { console.warn(String(e)); }
+    }
+    out[group] = hits;
+    console.log(`${group}: ${hits.length}`);
+  }
+  writeFileSync(join(DIR, 'candidates.json'), JSON.stringify(out, null, 2));
+}
+
+interface Picks { textures?: Record<string, string>; hdri?: Record<string, string>; models?: Record<string, string> }
+
+async function fetchPicks(): Promise<void> {
+  const picks = JSON.parse(readFileSync(join(DIR, 'picks.json'), 'utf8')) as Picks;
+  mkdirSync(OUT, { recursive: true });
+  const sharp = (await import('sharp')).default;
+  const credits: string[] = [];
+  // textures: name -> polyhaven id; each becomes <name>_diff.webp, <name>_nor.webp, <name>_rough.webp
+  for (const [name, id] of Object.entries(picks.textures ?? {})) {
+    const files = await getJson(`${API}/files/${id}`);
+    const maps: [string, string[]][] = [['diff', ['Diffuse', 'diff']], ['nor', ['nor_gl']], ['rough', ['Rough', 'rough']]];
+    for (const [suffix, keys] of maps) {
+      const key = keys.find((k) => files[k]);
+      if (!key) { console.warn(`${id}: no ${suffix}`); continue; }
+      const src = files[key]['1k']?.jpg?.url ?? files[key]['1k']?.png?.url;
+      const bytes = await getBytes(src);
+      await sharp(bytes).resize(1024, 1024).webp({ quality: suffix === 'diff' ? 82 : 88 }).toFile(join(OUT, `${name}_${suffix}.webp`));
+    }
+    credits.push(`- texture **${name}**: Poly Haven "${id}" (CC0) - https://polyhaven.com/a/${id}`);
+    console.log(`texture ${name} <- ${id}`);
+  }
+  for (const [name, id] of Object.entries(picks.hdri ?? {})) {
+    const files = await getJson(`${API}/files/${id}`);
+    writeFileSync(join(OUT, `${name}.hdr`), await getBytes(files.hdri['1k'].hdr.url));
+    credits.push(`- HDRI **${name}**: Poly Haven "${id}" (CC0) - https://polyhaven.com/a/${id}`);
+    console.log(`hdri ${name} <- ${id}`);
+  }
+  await MeshoptEncoder.ready;
+  const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({ 'meshopt.encoder': MeshoptEncoder });
+  for (const [name, id] of Object.entries(picks.models ?? {})) {
+    const files = await getJson(`${API}/files/${id}`);
+    const g = files.gltf['1k'].gltf;
+    const json = JSON.parse(new TextDecoder().decode(await getBytes(g.url)));
+    const resources: Record<string, Uint8Array<ArrayBuffer>> = {};
+    for (const [path, inc] of Object.entries(g.include ?? {})) resources[path] = await getBytes((inc as { url: string }).url);
+    const doc = await io.readJSON({ json, resources });
+    await doc.transform(dedup(), weld(), prune(), textureCompress({ encoder: sharp, targetFormat: 'webp', resize: [512, 512] }), meshopt({ encoder: MeshoptEncoder, level: 'medium' }));
+    const bytes = await io.writeBinary(doc);
+    writeFileSync(join(OUT, `${name}.glb`), bytes);
+    credits.push(`- model **${name}**: Poly Haven "${id}" (CC0) - https://polyhaven.com/a/${id}`);
+    console.log(`model ${name} <- ${id}: ${(bytes.length / 1024).toFixed(0)} KB`);
+  }
+  writeFileSync(join(OUT, 'CREDITS.md'), `# Poly Haven assets (CC0)\n\n${credits.join('\n')}\n`);
+}
+
+if (!existsSync(DIR)) mkdirSync(DIR, { recursive: true });
+(process.argv[2] === 'fetch' ? fetchPicks() : scout()).catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

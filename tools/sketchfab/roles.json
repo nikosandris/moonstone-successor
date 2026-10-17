@@ -96,5 +96,73 @@
     ],
     "maxFaces": 12000,
     "static": true
+  },
+  {
+    "role": "castle",
+    "queries": [
+      "medieval castle",
+      "stone keep",
+      "fortress medieval"
+    ],
+    "maxFaces": 60000,
+    "static": true
+  },
+  {
+    "role": "house",
+    "queries": [
+      "medieval house",
+      "timber frame house",
+      "medieval cottage"
+    ],
+    "maxFaces": 30000,
+    "static": true
+  },
+  {
+    "role": "windmill",
+    "queries": [
+      "medieval windmill",
+      "watermill medieval"
+    ],
+    "maxFaces": 30000,
+    "static": true
+  },
+  {
+    "role": "ruin",
+    "queries": [
+      "ruins medieval",
+      "ruined chapel",
+      "ruined tower"
+    ],
+    "maxFaces": 40000,
+    "static": true
+  },
+  {
+    "role": "stonecircle",
+    "queries": [
+      "stonehenge",
+      "stone circle",
+      "standing stones"
+    ],
+    "maxFaces": 40000,
+    "static": true
+  },
+  {
+    "role": "cave",
+    "queries": [
+      "cave entrance",
+      "rock cave",
+      "mountain cave"
+    ],
+    "maxFaces": 40000,
+    "static": true
+  },
+  {
+    "role": "tower",
+    "queries": [
+      "medieval watchtower",
+      "stone tower medieval"
+    ],
+    "maxFaces": 30000,
+    "static": true
   }
 ]
