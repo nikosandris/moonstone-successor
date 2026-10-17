@@ -15,7 +15,7 @@ const DIR = 'tools/sketchfab';
 const OUT = 'public/assets/sf';
 const LICENSES = ['cc0', 'by'];
 
-interface Role { role: string; queries: string[]; maxFaces?: number }
+interface Role { role: string; queries: string[]; maxFaces?: number; static?: boolean }
 interface Hit {
   uid: string; name: string; author: string; license: string; faces: number; animations: number; likes: number;
   url: string; thumb: string; query: string;
@@ -39,16 +39,20 @@ async function download(url: string, file: string): Promise<void> {
 
 async function scout(): Promise<void> {
   const roles = JSON.parse(readFileSync(join(DIR, 'roles.json'), 'utf8')) as Role[];
-  const out: Record<string, Hit[]> = {};
+  const only = process.argv[3]?.split(',');
+  const prev = existsSync(join(DIR, 'candidates.json')) ? JSON.parse(readFileSync(join(DIR, 'candidates.json'), 'utf8')) : {};
+  const out: Record<string, Hit[]> = only ? prev : {};
   mkdirSync(join(DIR, 'thumbs'), { recursive: true });
   for (const r of roles) {
+    if (only && !only.includes(r.role)) continue;
     const seen = new Map<string, Hit>();
     for (const q of r.queries) {
       for (const lic of LICENSES) {
         const params = new URLSearchParams({
-          type: 'models', q, downloadable: 'true', animated: 'true', rigged: 'true', license: lic,
+          type: 'models', q, downloadable: 'true', license: lic,
           sort_by: '-likeCount', count: '24', max_face_count: String(r.maxFaces ?? 80000),
         });
+        if (!r.static) { params.set('animated', 'true'); params.set('rigged', 'true'); }
         let data: any;
         try { data = await getJson(`${API}/search?${params}`); } catch (e) { console.warn(String(e)); continue; }
         for (const m of data.results ?? []) {
@@ -62,7 +66,7 @@ async function scout(): Promise<void> {
         }
       }
     }
-    const hits = [...seen.values()].filter((h) => h.animations > 0).sort((a, b) => b.likes - a.likes).slice(0, 12);
+    const hits = [...seen.values()].filter((h) => r.static || h.animations > 0).sort((a, b) => b.likes - a.likes).slice(0, 12);
     for (const [i, h] of hits.entries()) {
       if (!h.thumb) continue;
       try { await download(h.thumb, join(DIR, 'thumbs', `${r.role}_${i}_${h.uid}.jpg`)); } catch (e) { console.warn(String(e)); }

@@ -9,6 +9,10 @@ on:
         default: scout
         type: choice
         options: [scout, fetch]
+      roles:
+        description: optional comma-separated roles (scout only these, keep the rest)
+        required: false
+        default: ''
 
 permissions:
   contents: write
@@ -23,7 +27,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npx tsx scripts/sketchfab.ts ${{ inputs.mode }}
+      - run: npx tsx scripts/sketchfab.ts ${{ inputs.mode }} ${{ inputs.roles }}
         env:
           SKETCHFAB_TOKEN: ${{ secrets.SKETCHFAB_TOKEN }}
       - name: Commit results
