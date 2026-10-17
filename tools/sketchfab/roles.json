@@ -164,5 +164,36 @@
     ],
     "maxFaces": 30000,
     "static": true
+  },
+  {
+    "role": "pine",
+    "queries": [
+      "pine tree game ready",
+      "fir tree game ready",
+      "conifer tree low poly realistic",
+      "spruce tree game asset"
+    ],
+    "maxFaces": 12000,
+    "static": true
+  },
+  {
+    "role": "oak",
+    "queries": [
+      "oak tree game ready",
+      "deciduous tree game ready",
+      "tree game asset realistic"
+    ],
+    "maxFaces": 15000,
+    "static": true
+  },
+  {
+    "role": "bush",
+    "queries": [
+      "bush game ready",
+      "shrub game asset",
+      "fern game ready"
+    ],
+    "maxFaces": 6000,
+    "static": true
   }
 ]
