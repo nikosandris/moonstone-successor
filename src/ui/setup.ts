@@ -81,6 +81,22 @@ export function showSetup(root: HTMLElement, onStart: (players: PlayerSetup[], s
       modeRow.appendChild(b);
     }
     card.appendChild(modeRow);
+    const volRow = document.createElement('div');
+    volRow.className = 'row';
+    const volLab = document.createElement('label');
+    volLab.textContent = 'Volume';
+    const vol = document.createElement('input');
+    vol.type = 'range';
+    vol.min = '0';
+    vol.max = '100';
+    vol.value = String(Math.round(getSettings().volume * 100));
+    vol.style.flex = '1';
+    vol.oninput = () => updateSettings({ volume: Number(vol.value) / 100, muted: false });
+    const mute = document.createElement('button');
+    mute.textContent = getSettings().muted ? 'Unmute' : 'Mute';
+    mute.onclick = () => { updateSettings({ muted: !getSettings().muted }); render(); };
+    volRow.append(volLab, vol, mute);
+    card.appendChild(volRow);
     const start = document.createElement('button');
     start.className = 'big';
     start.textContent = 'Begin the hunt';

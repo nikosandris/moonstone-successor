@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { ArenaScene } from './ui/arena/ArenaScene';
 import { GameScene } from './ui/GameScene';
+import { audio } from './ui/audio';
 import { showSetup } from './ui/setup';
 import { H, W } from './ui/theme';
 import type { PlayerSetup } from './core/types';
@@ -8,6 +9,8 @@ import type { PlayerSetup } from './core/types';
 let game: Phaser.Game | null = null;
 
 function start(players: PlayerSetup[], seed: number): void {
+  audio.unlock();
+  audio.setAmbient(true);
   game?.destroy(true);
   game = new Phaser.Game({
     type: Phaser.AUTO,
@@ -35,6 +38,9 @@ function openSetup(): void {
   const root = document.getElementById('setup')!;
   showSetup(root, start);
 }
+
+// browsers only allow audio after a user gesture
+for (const ev of ['pointerdown', 'keydown']) window.addEventListener(ev, () => audio.unlock(), { capture: true });
 
 openSetup();
 

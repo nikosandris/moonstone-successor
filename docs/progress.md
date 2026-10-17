@@ -48,3 +48,18 @@
 
 **Known issues**
 - Fighters are flat vector silhouettes (no per-pixel lighting on them).
+
+## M4 - Game feel and audio (done)
+
+**Changed**
+- Arena: hit stop (50 ms normal, 110 ms on double-damage hits), screen shake scaled by damage, camera punch-zoom and red flash on heavy hits, bigger knockback, slow-motion finishing blow with fall animation, spreading blood pool (blood setting) and camera lean-in.
+- Map: tumbling die animation on roll, phase-change banner, Full-moon cinematic with sting when the Sanctum opens, tokens walk the roads.
+- Procedural WebAudio (`src/ui/audio.ts`): dice, steps, coins, purchase, heal, swing, whoosh, hit, heavy hit, metal clash, block, monster growl, window tick, death, victory/defeat fanfares, phase chime, Sanctum sting; ambient wind + drone loop.
+- Master volume slider and Mute on the setup screen, Sound/Muted toggle in the side panel (saved in localStorage).
+
+**Verification**
+- `npm test`: 102 pass. `npm run build`: 0 errors. Rules unchanged (sim: Sanctum 76.9%, 24.5 days, max seat 27.1%).
+- Playwright: Full-moon transition shows the cinematic; dice animation; heavy hit (blood, -44 x2 popup, knockback); finishing blow with pool and zoom staying inside the arena. AudioContext present and no audio errors. 0 console errors.
+
+**Known issues**
+- I cannot listen to the audio in a headless browser: sounds are verified to run without errors, not judged by ear.

@@ -15,10 +15,11 @@ import { getItem } from '../data/items';
 import { getMonster } from '../data/monsters';
 import { getScar } from '../data/scars';
 import {
-  COL, H, NODE_LABEL, SEAL_COLORS, W, hex,
+  COL, H, NODE_LABEL, SEAL_COLORS, SERIF, W, hex,
 } from './theme';
 import { generateTextures } from './art/textures';
-import { getSettings } from './settings';
+import { audio } from './audio';
+import { getSettings, updateSettings } from './settings';
 import { addBar, addButton, addPanel, addText } from './widgets';
 
 interface SceneData {
@@ -61,6 +62,7 @@ export class GameScene extends Phaser.Scene {
   private sanctumLight: Phaser.GameObjects.Light | null = null;
   private sanctumGlow: Phaser.GameObjects.Image | null = null;
   private lastPos: number[] = [];
+  private justRolled = false;
 
   // hot-seat duel flow (choices stay in memory until the reveal)
   private duelKey = '';
@@ -117,14 +119,65 @@ export class GameScene extends Phaser.Scene {
   // ------------------------------------------------------------ plumbing
 
   private dispatch(action: Action): void {
+    const before = this.state;
     try {
       this.state = applyAction(this.state, action);
     } catch (e) {
       this.flash((e as Error).message);
+      audio.play('block', 0.5);
       return;
     }
     this.infoNode = null;
+    this.feedback(before, action);
     this.render();
+  }
+
+  /** Sounds and cinematic moments derived from what an action changed (presentation only). */
+  private feedback(before: GameState, action: Action): void {
+    const s = this.state;
+    const k0 = before.players[before.current];
+    const k1 = s.players[before.current];
+    switch (action.type) {
+      case 'roll': audio.play('dice'); this.justRolled = true; break;
+      case 'move': audio.play('step'); break;
+      case 'buy': audio.play('buy'); break;
+      case 'heal': audio.play('heal'); break;
+      case 'useItem': audio.play('heal'); break;
+      case 'endTurn': audio.play('click'); break;
+      default: break;
+    }
+    if (action.type !== 'buy' && k1.gold > k0.gold) audio.play('coin');
+    if (s.stage === 'gameOver' && before.stage !== 'gameOver') audio.play(s.endReason === 'sanctum' ? 'victory' : 'chime');
+    const p0 = phaseForDay(before.day);
+    const p1 = phaseForDay(s.day);
+    if (p0 !== p1 && s.stage !== 'gameOver') {
+      if (p1 === 'full') this.sanctumCinematic();
+      else this.phaseBanner(PHASE_NAMES[p1]);
+    }
+  }
+
+  private phaseBanner(text: string): void {
+    audio.play('chime');
+    const t = this.add.text(347, 60, text.toUpperCase(), { fontFamily: SERIF, fontSize: '34px', fontStyle: 'bold', color: '#e8d6a8', stroke: '#000000', strokeThickness: 6, resolution: 2 }).setOrigin(0.5).setDepth(150).setAlpha(0);
+    this.tweens.add({ targets: t, alpha: 1, y: 80, duration: 500, yoyo: true, hold: 1400, onComplete: () => t.destroy() });
+  }
+
+  /** Full moon rises: darken, a huge moon swells, a sting, then the Sanctum glows. */
+  private sanctumCinematic(): void {
+    audio.play('sting');
+    const c = this.add.container(0, 0).setDepth(160);
+    const dark = this.add.rectangle(0, 0, W, H, 0x000000, 1).setOrigin(0, 0).setAlpha(0);
+    const glow = this.add.image(W / 2, 250, 'glow').setTint(0xfff0c0).setBlendMode(Phaser.BlendModes.ADD).setScale(1).setAlpha(0);
+    const moon = this.add.image(W / 2, 330, 'moon-full').setScale(0.4).setAlpha(0);
+    const t1 = this.add.text(W / 2, 430, 'THE FULL MOON RISES', { fontFamily: SERIF, fontSize: '40px', fontStyle: 'bold', color: '#ffe3a0', stroke: '#000', strokeThickness: 6, resolution: 2 }).setOrigin(0.5).setAlpha(0);
+    const t2 = this.add.text(W / 2, 480, 'The Sanctum stands open. Bring three Seals.', { fontFamily: SERIF, fontSize: '22px', color: '#e8d6a8', resolution: 2 }).setOrigin(0.5).setAlpha(0);
+    c.add([dark, glow, moon, t1, t2]);
+    this.tweens.add({ targets: dark, alpha: 0.88, duration: 500 });
+    this.tweens.add({ targets: moon, alpha: 1, y: 250, scale: 1.5, duration: 1800, ease: 'Sine.easeOut', delay: 300 });
+    this.tweens.add({ targets: glow, alpha: 0.7, scale: 5, duration: 2000, delay: 500 });
+    this.tweens.add({ targets: [t1, t2], alpha: 1, duration: 600, delay: 1300 });
+    this.cameras.main.shake(900, 0.003);
+    this.time.delayedCall(2900, () => this.tweens.add({ targets: c.list, alpha: 0, duration: 600, onComplete: () => c.destroy() }));
   }
 
   private flash(msg: string): void {
@@ -404,6 +457,11 @@ export class GameScene extends Phaser.Scene {
     addText(this, L, x0 + 76, 32, PHASE_NAMES[phase].toUpperCase(), { size: 20, bold: true, serif: true, color: phase === 'full' ? COL.gold : '#cfd3ff' });
     addText(this, L, x0 + 76, 56, open ? 'Sanctum is OPEN' : `Sanctum opens in ${daysUntilFull(s.day)} day(s)`, { size: 15, color: open ? COL.gold : COL.dim, bold: open });
     addText(this, L, x0 + 4, 82, moonEffect(s.day).text, { size: 12, color: COL.dim, wrap: 306 });
+    const muted = getSettings().muted;
+    addButton(this, L, W - 62, 8, 52, 30, muted ? 'Muted' : 'Sound', () => {
+      updateSettings({ muted: !getSettings().muted });
+      this.render();
+    }, { size: 11, fill: muted ? 0x3a2a2a : 0x2a3a2a });
 
     // active knight
     const y0 = 112;
@@ -500,10 +558,26 @@ export class GameScene extends Phaser.Scene {
         addText(this, L, bx, 442, `${k.name}'s move`, { size: 17, bold: true, color: hex(k.color) });
         addButton(this, L, bx, 470, bw, 90, 'ROLL THE DIE', () => this.dispatch({ type: 'roll' }), { size: 26, fill: COL.primary });
         break;
-      case 'move':
-        addText(this, L, 561, 438, `Rolled ${s.moveRoll}`, { size: 34, bold: true, align: 'center', color: COL.gold });
-        addText(this, L, 561, 486, `Tap a glowing node to move up to ${s.moveRoll} step(s). Tap your own node to stay.`, { size: 15, align: 'center', wrap: bw });
+      case 'move': {
+        const rolled = addText(this, L, 600, 438, `Rolled ${s.moveRoll}`, { size: 34, bold: true, align: 'center', color: COL.gold });
+        const die = this.drawDie(505, 462, s.moveRoll);
+        if (this.justRolled) {
+          this.justRolled = false;
+          rolled.setAlpha(0);
+          let n = 0;
+          this.time.addEvent({
+            delay: 55, repeat: 8, callback: () => {
+              n++;
+              die.setData('face', n < 9 ? 1 + Math.floor(Math.random() * 6) : s.moveRoll);
+              this.paintDie(die, n < 9 ? (die.getData('face') as number) : s.moveRoll);
+              die.setAngle(n < 9 ? (Math.random() - 0.5) * 50 : 0);
+              if (n >= 9) rolled.setAlpha(1);
+            },
+          });
+        }
+        addText(this, L, 561, 494, `Tap a glowing node (up to ${s.moveRoll} steps). Tap your own node to stay.`, { size: 14, align: 'center', wrap: bw });
         break;
+      }
       case 'pvpOffer': {
         addText(this, L, bx, 440, 'A rival stands here!', { size: 16, bold: true });
         let yy = 464;
@@ -528,6 +602,28 @@ export class GameScene extends Phaser.Scene {
       default:
         addText(this, L, 561, 490, 'Resolve the encounter...', { size: 16, align: 'center', color: COL.dim });
     }
+  }
+
+  private drawDie(x: number, y: number, face: number): Phaser.GameObjects.Graphics {
+    const g = this.add.graphics({ x, y });
+    this.uiLayer.add(g);
+    this.paintDie(g, face);
+    return g;
+  }
+
+  private paintDie(g: Phaser.GameObjects.Graphics, face: number): void {
+    g.clear();
+    g.fillStyle(0xe8e0cc, 1);
+    g.fillRoundedRect(-22, -22, 44, 44, 8);
+    g.lineStyle(2, 0x6a5634, 1);
+    g.strokeRoundedRect(-22, -22, 44, 44, 8);
+    g.fillStyle(0x8c2f39, 1);
+    const P: Record<number, [number, number][]> = {
+      1: [[0, 0]], 2: [[-10, -10], [10, 10]], 3: [[-10, -10], [0, 0], [10, 10]],
+      4: [[-10, -10], [10, -10], [-10, 10], [10, 10]], 5: [[-10, -10], [10, -10], [0, 0], [-10, 10], [10, 10]],
+      6: [[-10, -11], [10, -11], [-10, 0], [10, 0], [-10, 11], [10, 11]],
+    };
+    for (const [px, py] of P[Math.max(1, Math.min(6, face))] ?? []) g.fillCircle(px, py, 4.5);
   }
 
   // ------------------------------------------------------------ modals

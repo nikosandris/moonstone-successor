@@ -6,6 +6,7 @@ import { moonEffect, phaseForDay } from '../../core/moon';
 import type { Action, Choice, GameState, Knight } from '../../core/types';
 import { getItem } from '../../data/items';
 import { getMonster } from '../../data/monsters';
+import { audio } from '../audio';
 import { getSettings } from '../settings';
 import { COL, H, W, hex } from '../theme';
 import { addBar, addButton, addText } from '../widgets';
@@ -79,6 +80,8 @@ export class ArenaScene extends Phaser.Scene {
     const speed = getSettings().animSpeed * urlSpeed;
     this.time.timeScale = speed;
     this.tweens.timeScale = speed;
+    this.add.rectangle(-200, -200, W + 400, H + 400, 0x000000).setOrigin(0, 0);
+    this.cameras.main.setBounds(0, 0, W, H);
     this.drawBackdrop();
     const c = this.s.combat!;
     const ka = this.s.players[c.a];
@@ -96,7 +99,7 @@ export class ArenaScene extends Phaser.Scene {
     this.hud = this.add.container(0, 0);
     this.fx = this.add.container(0, 0).setDepth(50);
     this.controls = this.add.container(0, 0).setDepth(60);
-    this.banner = this.add.text(W / 2, 150, '', { fontFamily: 'system-ui, sans-serif', fontSize: '40px', fontStyle: 'bold', color: '#ffffff', stroke: '#000000', strokeThickness: 6, resolution: 2 }).setOrigin(0.5).setDepth(70);
+    this.banner = this.add.text(W / 2, 215, '', { fontFamily: 'system-ui, sans-serif', fontSize: '40px', fontStyle: 'bold', color: '#ffffff', stroke: '#000000', strokeThickness: 6, resolution: 2 }).setOrigin(0.5).setDepth(70);
     this.input.keyboard?.on('keydown', (e: KeyboardEvent) => this.onKey(e));
     this.drawHud();
     this.prep();
@@ -358,6 +361,8 @@ export class ArenaScene extends Phaser.Scene {
     } else if (this.human('a')) this.drawMoveButtons('a', W / 2 - 300, 600, 'JKL');
     this.drawHud();
     this.timer = this.time.delayedCall(this.windowMs, () => this.impact());
+    audio.play('tick');
+    if (c.kind !== 'pvp' && Math.random() < 0.35) audio.play('growl');
   }
 
   update(): void {
@@ -453,6 +458,7 @@ export class ArenaScene extends Phaser.Scene {
     for (const [f, ch] of [[this.a, c.lastA ?? ca], [this.b, c.lastB ?? cb]] as const) {
       if (ch !== 'guard') this.dustFx.explode(8, f.x, GROUND);
     }
+    audio.play((c.lastA ?? ca) === 'feint' || (c.lastB ?? cb) === 'feint' ? 'whoosh' : 'swing');
     this.time.delayedCall(IMPACT_MS * 0.35, () => {
       const midX = (this.a.x + this.b.x) / 2;
       if (winner === 'tie' || (c.lastA === 'guard' && winner === 'a') || (c.lastB === 'guard' && winner === 'b')) this.sparkFx.explode(18, midX, GROUND - 90);
@@ -460,7 +466,18 @@ export class ArenaScene extends Phaser.Scene {
       if (dmgB > 0) this.blood(this.b.x, this.b.centerY, winner === 'a' ? 26 : 12);
       if (dmgA > 0) { this.a.hitReact(winner === 'b', IMPACT_MS); this.popText(this.a, `-${dmgA}${winner === 'b' ? '  x2' : ''}`, '#ff6b6b'); }
       if (dmgB > 0) { this.b.hitReact(winner === 'a', IMPACT_MS); this.popText(this.b, `-${dmgB}${winner === 'a' ? '  x2' : ''}`, '#ff6b6b'); }
-      if (winner !== 'tie') this.cameras.main.shake(120, winner === 'a' ? 0.006 : 0.009);
+      const heavy = winner !== 'tie' && Math.max(dmgA, dmgB) > 0;
+      if (winner === 'tie') audio.play('clash');
+      else if ((c.lastA === 'guard' && winner === 'a') || (c.lastB === 'guard' && winner === 'b')) audio.play('block');
+      if (dmgA > 0 || dmgB > 0) audio.play(heavy ? 'heavy' : 'hit', Math.min(1.4, Math.max(dmgA, dmgB) / 12));
+      const big = Math.max(dmgA, dmgB);
+      this.cameras.main.shake(heavy ? 220 : 120, Math.min(0.02, 0.004 + big * 0.0006));
+      if (heavy) {
+        this.hitStop(110);
+        this.cameras.main.zoomTo(1.07, 70, 'Quad.easeOut', true);
+        this.time.delayedCall(140, () => this.cameras.main.zoomTo(1, 260, 'Quad.easeOut', true));
+        this.cameras.main.flash(90, 90, 10, 10, true);
+      } else if (big > 0) this.hitStop(50);
     });
     for (const side of hesitated) this.popText(side === 'a' ? this.a : this.b, 'Hesitated! (Guard)', '#bfc4ee');
     const nameOf = (side: Side) => this.knight(side)?.name ?? c.monster!.name;
@@ -479,7 +496,24 @@ export class ArenaScene extends Phaser.Scene {
     this.drawHud();
     this.clearControls();
     const loser = c.outcome === 'a' ? this.b : this.a;
+    // slow-motion finish: the loser falls, a pool spreads, the camera leans in
+    this.time.timeScale *= 0.4;
+    this.tweens.timeScale *= 0.4;
+    window.setTimeout(() => {
+      this.time.timeScale /= 0.4;
+      this.tweens.timeScale /= 0.4;
+    }, 900);
+    audio.play('death');
     loser.die(800);
+    if (getSettings().blood) {
+      const pool = this.add.ellipse(loser.x, GROUND + 4, 10, 4, 0x5a0808, 0.85).setDepth(5);
+      this.tweens.add({ targets: pool, scaleX: 12, scaleY: 3, duration: 1600, ease: 'Quad.easeOut' });
+    }
+    this.cameras.main.pan(W / 2 + (loser.x - W / 2) * 0.5, H / 2 + 20, 600, 'Sine.easeInOut');
+    this.cameras.main.zoomTo(1.12, 600, 'Sine.easeInOut');
+    const humanWon = (c.outcome === 'a' && this.human('a')) || (c.outcome === 'b' && this.human('b'));
+    const humanLost = (c.outcome === 'b' && this.human('a')) || (c.outcome === 'a' && this.human('b'));
+    this.time.delayedCall(500, () => audio.play(humanWon || !humanLost ? 'victory' : 'defeat'));
     const winnerName = c.outcome === 'a' ? this.knight('a')!.name : this.knight('b')?.name ?? c.monster!.name;
     this.banner.setText(`${winnerName} is victorious!`).setFontSize(36).setAlpha(1);
     this.tweens.killTweensOf(this.banner);
@@ -492,6 +526,18 @@ export class ArenaScene extends Phaser.Scene {
     if (this.phase !== 'over') return;
     this.phase = 'prep';
     this.host.dispatch({ type: 'continue' });
+  }
+
+  /** Freeze the action for a beat so hits land with weight. Uses real time, not scene time. */
+  private hitStop(ms: number): void {
+    const t0 = this.time.timeScale;
+    const w0 = this.tweens.timeScale;
+    this.time.timeScale = t0 * 0.03;
+    this.tweens.timeScale = w0 * 0.03;
+    window.setTimeout(() => {
+      this.time.timeScale = t0;
+      this.tweens.timeScale = w0;
+    }, ms);
   }
 
   private popText(f: Fighter, text: string, color: string): void {

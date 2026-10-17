@@ -22,3 +22,6 @@ One line each: decision - reasoning.
 - M3: Real Phaser Light2D on the map terrain (villages warm, homes in player colour, lairs red, Sanctum blue/gold) with ambient light following the moon phase; additive glow sprites duplicate the lights so Canvas renderers still look lit.
 - M3: Palette moved to dark fantasy (ink purples, bronze frames, parchment text, crimson primary) with serif headings from system fonts (Georgia/Palatino) - no web fonts to download.
 - M3: Blood particles respect a `blood` setting (sparks instead when off), echoing the original's optional gore toggle.
+- M4: Hit stop is done by scaling scene time and tweens to 3% for 50-110 ms on a real-time `setTimeout` - freezes everything (timers included) without touching game state.
+- M4: All audio is synthesised (oscillators + filtered noise, `src/ui/audio.ts`); the AudioContext is created on the first pointer/key press to satisfy autoplay rules. Ambient = wandering-band wind + breathing low drone.
+- M4: Sanctum opening gets a full-screen cinematic (darken, rising full moon, choir-like sting, shake); other phase changes only get a banner + chime so the big moment stays special.
