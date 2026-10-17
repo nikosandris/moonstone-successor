@@ -3,7 +3,7 @@ import { botAction } from '../core/bot';
 import { allowedChoices, choiceCost } from '../core/combat';
 import {
   actorId, applyAction, buyCheck, canFlee, combatFighters, combatHp, createGame, fleeCost, healQuote,
-  nextKnightId, stealableSeals,
+  affinityText, eventOptionBlock, nextKnightId, stealableSeals,
 } from '../core/game';
 import { reachable, shortestPath } from '../core/graph';
 import { daysUntilFull, isSanctumOpen, moonEffect, phaseForDay } from '../core/moon';
@@ -14,6 +14,7 @@ import { BOARD } from '../data/board';
 import { getItem } from '../data/items';
 import { getMonster } from '../data/monsters';
 import { getScar } from '../data/scars';
+import { LEVEL_THRESHOLDS, getBoon } from '../data/boons';
 import {
   COL, H, NODE_LABEL, SEAL_COLORS, SERIF, W, hex,
 } from './theme';
@@ -207,6 +208,8 @@ export class GameScene extends Phaser.Scene {
     if (s.stage === 'shop') this.drawShop();
     else if (s.stage === 'combat' && !arena) this.drawCombat();
     else if (s.stage === 'pvpLoot') this.drawPvpLoot();
+    else if (s.stage === 'event') this.drawEvent();
+    else if (s.stage === 'levelUp') this.drawLevelUp();
     else if (s.stage === 'gameOver') this.drawGameOver();
     this.scheduleBot();
   }
@@ -421,7 +424,8 @@ export class GameScene extends Phaser.Scene {
       case 'village': return `${n.name} (Village): shop and healing for gold.`;
       case 'lair': {
         const m = getMonster(n.monster!);
-        return `${n.name} (Lair): ${m.name} guards Seal ${n.seal! + 1}. ${m.hint}`;
+        const aff = affinityText(m.id, s.day);
+        return `${n.name} (Lair): ${m.name} guards Seal ${n.seal! + 1}. ${m.hint}${aff ? ` ${aff}.` : ''}`;
       }
       case 'ruins': {
         const ready = s.day >= (s.ruinsReady[n.id] ?? 0);
@@ -511,6 +515,11 @@ export class GameScene extends Phaser.Scene {
       addText(this, L, x0 + 4, scy + 18 + i * 16, `${sc.name}: ${sc.desc}`, { size: 12, color: COL.bad });
     });
     if (k.scars.length > 3) addText(this, L, x0 + 4, scy + 18 + 48, `+${k.scars.length - 3} more`, { size: 12, color: COL.bad });
+    // renown and boons
+    const by = scy + 88;
+    const nextAt = LEVEL_THRESHOLDS[k.boons.length + k.pendingBoons];
+    addText(this, L, x0 + 4, by, `Renown ${k.renown}${nextAt ? ` (level-up at ${nextAt})` : ''}`, { size: 13, bold: true, color: '#ffd36a' });
+    if (k.boons.length) addText(this, L, x0 + 4, by + 18, k.boons.map((id) => getBoon(id).name).join(', '), { size: 12, color: '#e8d6a8', wrap: 306 });
 
     // all knights
     const ky = H - 4 - 8 - s.players.length * 20 - 20;
@@ -685,25 +694,83 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
+  private drawEvent(): void {
+    const s = this.state;
+    const e = s.event!;
+    const k = s.players[s.current];
+    if (k.bot) return;
+    const M = this.modalLayer;
+    this.overlay(0.8);
+    const h = 190 + e.options.length * 70;
+    const y0 = (H - h) / 2;
+    addPanel(this, M, 212, y0, 600, h);
+    addText(this, M, 512, y0 + 16, e.title, { size: 28, bold: true, serif: true, align: 'center', color: '#e8d6a8' });
+    addText(this, M, 512, y0 + 60, e.text, { size: 17, align: 'center', wrap: 540 });
+    addText(this, M, 790, y0 + 20, `Gold ${k.gold}`, { size: 15, bold: true, align: 'right', color: COL.gold });
+    e.options.forEach((o, i) => {
+      const why = eventOptionBlock(s, i);
+      addButton(this, M, 252, y0 + 150 + i * 70, 520, 60, o.label, () => this.dispatch({ type: 'eventChoice', index: i }), {
+        size: 19, enabled: why === null, fill: i === e.options.length - 1 ? 0x3a3446 : COL.primary, sub: why ?? o.hint,
+      });
+    });
+  }
+
+  private drawLevelUp(): void {
+    const s = this.state;
+    const k = s.players[s.current];
+    if (k.bot) return;
+    const M = this.modalLayer;
+    this.overlay(0.85);
+    addPanel(this, M, 132, 90, 760, 380);
+    addText(this, M, 512, 108, 'LEVEL UP', { size: 34, bold: true, serif: true, align: 'center', color: '#ffd36a' });
+    addText(this, M, 512, 152, `${k.name}'s renown grows (${k.renown} victories). Choose a boon - it lasts all game.`, { size: 16, align: 'center', color: COL.dim, wrap: 700 });
+    (s.boonChoices ?? []).forEach((id, i) => {
+      const b = getBoon(id);
+      const x = 162 + i * 240;
+      addButton(this, M, x, 200, 220, 220, b.name, () => { audio.play('chime'); this.dispatch({ type: 'chooseBoon', id }); }, { size: 26, fill: 0x3a2f5e, sub: b.desc });
+    });
+    if (k.boons.length) addText(this, M, 512, 436, `Boons so far: ${k.boons.map((id) => getBoon(id).name).join(', ')}`, { size: 13, align: 'center', color: COL.dim });
+  }
+
+  /** End-of-game summary: standings and per-knight story of the hunt. */
   private drawGameOver(): void {
     const s = this.state;
     const M = this.modalLayer;
     const w = s.players[s.winner!];
-    this.overlay(0.9);
-    addPanel(this, M, 212, 70, 600, 440);
-    addText(this, M, 512, 90, 'GAME OVER', { size: 20, align: 'center', color: COL.dim });
-    addText(this, M, 512, 118, `${w.name} wins!`, { size: 40, bold: true, serif: true, align: 'center', color: hex(w.color) });
-    addText(this, M, 512, 170, s.endReason === 'sanctum' ? 'Slew the Hollow Warden and claimed the Sanctum.' : `Day ${CONFIG.dayCap} ended: most Seals (then gold) wins.`, { size: 17, align: 'center', wrap: 560 });
-    const ranked = [...s.players].sort((a, b) => b.seals.length - a.seals.length || b.gold - a.gold);
+    this.overlay(0.92);
+    addPanel(this, M, 32, 20, 960, 536);
+    addText(this, M, 512, 30, 'THE HUNT IS OVER', { size: 16, align: 'center', color: COL.dim });
+    addText(this, M, 512, 50, `${w.name} wins!`, { size: 38, bold: true, serif: true, align: 'center', color: hex(w.color) });
+    addText(this, M, 512, 98, s.endReason === 'sanctum' ? `Slew the Hollow Warden on day ${s.day} and claimed the Sanctum.` : `Day ${CONFIG.dayCap} ended: most Seals (then gold) wins.`, { size: 16, align: 'center', wrap: 900 });
+    const cols: [string, number][] = [['Knight', 60], ['Seals', 300], ['Gold', 370], ['Fights won', 440], ['Duels', 550], ['Deaths', 620], ['Levels', 700], ['Scars', 780]];
+    for (const [label, x] of cols) addText(this, M, x, 134, label, { size: 13, bold: true, color: COL.dim });
+    const ranked = [...s.players].sort((a, b) => (b.id === w.id ? 1 : 0) - (a.id === w.id ? 1 : 0) || b.seals.length - a.seals.length || b.gold - a.gold);
     ranked.forEach((p, i) => {
-      const y = 230 + i * 34;
-      this.modalLayer.add(this.add.circle(250, y + 11, 9, p.color));
-      addText(this, M, 270, y, `${p.name}`, { size: 20, bold: p.id === w.id });
-      addText(this, M, 520, y + 2, `${p.seals.length} Seals`, { size: 17 });
-      addText(this, M, 620, y + 2, `${p.gold}g`, { size: 17, color: COL.gold });
-      addText(this, M, 700, y + 2, `${p.deaths} deaths`, { size: 17, color: COL.bad });
+      const y = 160 + i * 62;
+      addPanel(this, M, 50, y - 6, 924, 56, p.id === w.id ? 0x2a2236 : 0x1a1626);
+      this.modalLayer.add(this.add.circle(68, y + 12, 9, p.color));
+      addText(this, M, 84, y, p.name, { size: 19, bold: true, serif: true, color: hex(p.color) });
+      addText(this, M, 84, y + 24, p.boons.length ? p.boons.map((id) => getBoon(id).name).join(', ') : 'no boons', { size: 11, color: COL.dim, wrap: 200 });
+      addText(this, M, 300, y + 4, `${p.seals.length}/4`, { size: 18 });
+      addText(this, M, 370, y + 4, `${p.gold}`, { size: 18, color: COL.gold });
+      addText(this, M, 440, y + 4, `${p.kills}`, { size: 18 });
+      addText(this, M, 550, y + 4, `${p.duelsWon}`, { size: 18 });
+      addText(this, M, 620, y + 4, `${p.deaths}`, { size: 18, color: p.deaths ? COL.bad : COL.text });
+      addText(this, M, 700, y + 4, `${p.boons.length}`, { size: 18 });
+      addText(this, M, 780, y, p.scars.length ? p.scars.map((id) => getScar(id).name).join(', ') : 'unscarred', { size: 12, color: p.scars.length ? COL.bad : COL.dim, wrap: 180 });
     });
-    addButton(this, M, 312, 400, 400, 60, 'Back to setup', () => this.onExit(), { size: 22, fill: COL.primary });
+    // awards
+    const most = (f: (k: Knight) => number) => [...s.players].sort((a, b) => f(b) - f(a))[0];
+    const feared = most((k) => k.kills);
+    const scarred = most((k) => k.scars.length);
+    const rich = most((k) => k.goldEarned);
+    const awards = [
+      `Most Feared: ${feared.name} (${feared.kills} wins)`,
+      scarred.scars.length ? `Most Scarred: ${scarred.name} (${scarred.scars.length})` : 'Nobody was scarred',
+      `Deepest Purse: ${rich.name} (${rich.goldEarned} gold earned)`,
+    ];
+    addText(this, M, 512, 160 + s.players.length * 62 + 4, awards.join('     '), { size: 14, align: 'center', color: '#e8d6a8', wrap: 900 });
+    addButton(this, M, 312, 488, 400, 54, 'Back to setup', () => this.onExit(), { size: 22, fill: COL.primary });
   }
 
   // ------------------------------------------------------------ combat
@@ -806,7 +873,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.overlay(0.97);
-    const title = c.kind === 'pvp' ? `DUEL: ${a.name} vs ${b!.name}` : c.kind === 'guardian' ? 'THE SANCTUM GUARDIAN' : `LAIR FIGHT: ${c.monster!.name}`;
+    const title = c.kind === 'pvp' ? `DUEL: ${a.name} vs ${b!.name}` : c.kind === 'guardian' ? 'THE SANCTUM GUARDIAN' : `${c.kind === 'wild' ? 'AMBUSH' : 'LAIR FIGHT'}: ${c.monster!.name}`;
     addText(this, M, 512, 14, title, { size: 24, bold: true, align: 'center' });
     addText(this, M, 512, 42, c.over ? 'Fight over' : `Round ${c.round + 1}`, { size: 16, align: 'center', color: COL.dim });
 

@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { botAction } from '../../core/bot';
 import { allowedChoices } from '../../core/combat';
-import { canFlee, combatFighters, combatHp, fleeCost, previewMonsterChoice } from '../../core/game';
+import { affinityText, canFlee, combatFighters, combatHp, fleeCost, previewMonsterChoice } from '../../core/game';
 import { moonEffect, phaseForDay } from '../../core/moon';
 import type { Action, Choice, GameState, Knight } from '../../core/types';
 import { getItem } from '../../data/items';
@@ -241,11 +241,12 @@ export class ArenaScene extends Phaser.Scene {
         addText(this, this.hud, x + 160, 80, 'READY', { size: 16, bold: true, color: COL.good });
       }
     }
-    const title = c.kind === 'pvp' ? 'DUEL' : c.kind === 'guardian' ? 'THE WARDEN' : 'LAIR';
+    const title = c.kind === 'pvp' ? 'DUEL' : c.kind === 'guardian' ? 'THE WARDEN' : c.kind === 'wild' ? 'AMBUSH' : 'LAIR';
     addText(this, this.hud, W / 2, 10, `${title} - Round ${c.round + 1}`, { size: 18, bold: true, align: 'center' });
     if (c.monsterId) {
       addText(this, this.hud, W / 2, 34, getMonster(c.monsterId).hint, { size: 13, align: 'center', color: '#ffd7a8', wrap: 330 });
-      addText(this, this.hud, W / 2, 86, moonEffect(s.day).text, { size: 11, align: 'center', color: COL.dim, wrap: 330 });
+      const aff = affinityText(c.monsterId, s.day);
+      addText(this, this.hud, W / 2, 86, aff ?? moonEffect(s.day).text, { size: 11, align: 'center', color: aff ? '#ff9d8a' : COL.dim, wrap: 330 });
     }
     if (c.roundLog.length && this.phase !== 'window') {
       addText(this, this.hud, W / 2, 112, c.roundLog.slice(1).join('\n'), { size: 14, align: 'center', color: '#e8e6f0', wrap: 420 });

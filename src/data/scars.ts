@@ -12,6 +12,10 @@ export const SCARS: ScarDef[] = [
   { id: 'coldResolve', name: 'Cold Resolve', desc: '+2 max Stamina, -1 Attack', effect: { maxStamina: 2, attack: -1 } },
   { id: 'debtMarked', name: 'Debt-Marked', desc: 'Shop prices +25%', effect: { shopPct: 25 } },
   { id: 'tenacious', name: 'Tenacious', desc: '+3 max HP, -1 to movement rolls', effect: { maxHp: 3, move: -1 } },
+  { id: 'burnedHands', name: 'Burned Hands', desc: 'Strike costs +1 Stamina', effect: { strikeExtra: 1 } },
+  { id: 'frostbitten', name: 'Frostbitten', desc: '-1 Defense', effect: { defense: -1 } },
+  { id: 'veteran', name: 'Grim Veteran', desc: '+1 Attack, -3 max HP', effect: { attack: 1, maxHp: -3 } },
+  { id: 'haunted', name: 'Haunted', desc: 'Monsters you fight get +1 Attack', effect: { foeAttack: 1 } },
 ];
 
 export function getScar(id: string): ScarDef {

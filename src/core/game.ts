@@ -1,10 +1,13 @@
 import { CONFIG, SEAL_GOLD_BONUS, ruinsTierWeights } from '../data/balance';
 import { ITEMS, START_ARMOR, START_WEAPON, getItem, lootPool } from '../data/items';
-import { getMonster, GUARDIAN } from '../data/monsters';
+import { BOONS, LEVEL_THRESHOLDS, getBoon } from '../data/boons';
+import { EVENTS } from '../data/events';
+import { getMonster, GUARDIAN, WANDERERS } from '../data/monsters';
 import { SCARS } from '../data/scars';
 import { isAllowed, monsterChoose, resolveRound, type Fighter } from './combat';
 import { distancesFrom, homeNode, node } from './graph';
 import { isSanctumOpen, moonEffect, phaseForDay } from './moon';
+import { reachable as reachableNodes } from './graph';
 import { Rng, seedToState } from './rng';
 import { effectiveStats, shopPrice } from './stats';
 import type {
@@ -44,6 +47,11 @@ export function createGame(setups: PlayerSetup[], seed: number): GameState {
     downed: false,
     deaths: 0,
     kills: 0,
+    duelsWon: 0,
+    renown: 0,
+    boons: [],
+    pendingBoons: 0,
+    goldEarned: 0,
   }));
   const s: GameState = {
     seed,
@@ -59,6 +67,8 @@ export function createGame(setups: PlayerSetup[], seed: number): GameState {
     combat: null,
     pendingLoot: null,
     challengeable: [],
+    event: null,
+    boonChoices: null,
     log: [],
     winner: null,
     endReason: null,
@@ -151,18 +161,56 @@ export function combatHp(s: GameState, side: 'a' | 'b'): { hp: number; maxHp: nu
   return { hp: s.players[c.b!].hp, maxHp: effectiveStats(s.players[c.b!]).maxHp };
 }
 
-export function monsterStatsForDay(monsterId: string, day: number): MonsterFighter {
+/** Monster stats for a day: general moon effect, then the monster's own phase affinity. */
+export function monsterStatsForDay(monsterId: string, day: number, foeAttack = 0): MonsterFighter {
   const def = getMonster(monsterId);
   const m = moonEffect(day);
-  const hp = Math.max(1, Math.round(def.hp * m.hpMult));
+  const phase = phaseForDay(day);
+  const aff = def.strongPhase === phase ? CONFIG.affinity.strong : def.weakPhase === phase ? CONFIG.affinity.weak : null;
+  const hp = Math.max(1, Math.round(def.hp * m.hpMult * (aff?.hpMult ?? 1)));
   return {
     id: def.id,
     name: def.name,
     hp,
     maxHp: hp,
-    attack: Math.max(1, def.attack + m.attack),
+    attack: Math.max(1, def.attack + m.attack + (aff?.attack ?? 0) + foeAttack),
     defense: Math.max(0, def.defense + m.defense),
   };
+}
+
+/** Short text for a monster's affinity on a given day, or null. */
+export function affinityText(monsterId: string, day: number): string | null {
+  const def = getMonster(monsterId);
+  const phase = phaseForDay(day);
+  if (def.strongPhase === phase) return `${def.name} is at its strongest under this moon`;
+  if (def.weakPhase === phase) return `${def.name} is weakened under this moon`;
+  return null;
+}
+
+function gainGold(k: Knight, n: number): void {
+  k.gold += n;
+  k.goldEarned += n;
+}
+
+/** A victory: renown, and a level-up offer once a threshold is crossed. */
+function addRenown(s: GameState, k: Knight, n = 1): void {
+  k.renown += n;
+  while (k.boons.length + k.pendingBoons < LEVEL_THRESHOLDS.length && k.renown >= LEVEL_THRESHOLDS[k.boons.length + k.pendingBoons]) {
+    k.pendingBoons += 1;
+    log(s, `${k.name} gains renown and will level up at the start of their next turn!`);
+  }
+}
+
+function offerBoons(s: GameState): void {
+  const rng = new Rng(s);
+  const pool = BOONS.map((b) => b.id);
+  const picks: string[] = [];
+  while (picks.length < 3) {
+    const id = rng.pick(pool);
+    if (!picks.includes(id)) picks.push(id);
+  }
+  s.boonChoices = picks;
+  s.stage = 'levelUp';
 }
 
 export function fleeCost(k: Knight): number {
@@ -226,6 +274,7 @@ function startTurn(s: GameState): void {
     k.hp = effectiveStats(k).maxHp;
     log(s, `${k.name} rises at Home, scarred but alive.`);
   }
+  if (k.pendingBoons > 0) offerBoons(s);
 }
 
 function endGameByCap(s: GameState): void {
@@ -303,6 +352,10 @@ function resolveNode(s: GameState): void {
       }
       break;
     case 'road':
+      if (rng.float() < CONFIG.roadEventChance) {
+        startEvent(s);
+        return;
+      }
       log(s, `${k.name} travels the road to ${nd.name}.`);
       break;
     case 'village':
@@ -328,7 +381,7 @@ function resolveNode(s: GameState): void {
       const outcome = rng.weighted(['gold', 'loot', 'trap', 'nothing'] as const, [w.gold, w.loot, w.trap, w.nothing]);
       if (outcome === 'gold') {
         const g = rng.int(CONFIG.ruins.goldMin, CONFIG.ruins.goldMax);
-        k.gold += g;
+        gainGold(k, g);
         log(s, `${k.name} finds ${g} gold in ${nd.name}.`);
       } else if (outcome === 'loot') {
         const item = randomLoot(s, rollTier(s));
@@ -357,6 +410,134 @@ function resolveNode(s: GameState): void {
   afterEncounter(s);
 }
 
+// ---------------------------------------------------------------- road events
+
+function startEvent(s: GameState): void {
+  const k = currentKnight(s);
+  const rng = new Rng(s);
+  const def = rng.weighted(EVENTS, EVENTS.map((e) => e.weight));
+  const data: Record<string, string | number> = {};
+  if (def.id === 'merchant') {
+    const item = randomLoot(s, rollTier(s));
+    data.item = item.id;
+    data.price = Math.max(5, Math.round(item.price * 0.7));
+  } else if (def.id === 'ambush') {
+    data.monster = rng.pick(Object.keys(WANDERERS));
+    data.flee = fleeCost(k);
+  }
+  const fill = (str: string) =>
+    str
+      .replace('{item}', data.item ? getItem(String(data.item)).name : '')
+      .replace('{price}', String(data.price ?? ''))
+      .replace('{desc}', data.item ? getItem(String(data.item)).desc : '')
+      .replace('{monster}', data.monster ? getMonster(String(data.monster)).name : '')
+      .replace('{flee}', String(data.flee ?? ''));
+  s.event = {
+    id: def.id,
+    title: def.title,
+    text: fill(def.text),
+    options: def.options.map((o) => ({ label: fill(o.label), hint: fill(o.hint) })),
+    data,
+  };
+  s.stage = 'event';
+  log(s, `${k.name} on the road: ${def.title}.`);
+}
+
+/** Why an event option cannot be picked right now, or null. */
+export function eventOptionBlock(s: GameState, index: number): string | null {
+  const e = s.event;
+  const k = currentKnight(s);
+  if (!e || index < 0 || index >= e.options.length) return 'No such option';
+  const cost: Record<string, number[]> = { merchant: [Number(e.data.price)], dice: [10, 30], traveler: [10], hermit: [40] };
+  const c = cost[e.id]?.[index];
+  if (c !== undefined && k.gold < c) return 'Not enough gold';
+  if (e.id === 'merchant' && index === 0) {
+    const item = getItem(String(e.data.item));
+    if (item.kind === 'consumable' && k.consumables.length >= 3) return 'Pack is full';
+  }
+  return null;
+}
+
+function resolveEvent(s: GameState, index: number): void {
+  const e = s.event!;
+  const k = currentKnight(s);
+  const rng = new Rng(s);
+  s.event = null;
+  switch (e.id) {
+    case 'merchant':
+      if (index === 0) {
+        const item = getItem(String(e.data.item));
+        k.gold -= Number(e.data.price);
+        log(s, `${k.name} pays ${e.data.price}g. ${awardItem(k, item)}`);
+      } else log(s, `${k.name} waves the merchant off.`);
+      break;
+    case 'ambush':
+      if (index === 0) {
+        startCombat(s, 'wild', k.id, null, String(e.data.monster));
+        return;
+      }
+      {
+        const cost = fleeCost(k);
+        k.gold -= cost;
+        k.buffs.freeFlee = false;
+        log(s, `${k.name} escapes${cost ? `, dropping ${cost} gold` : ''}.`);
+      }
+      break;
+    case 'shrine':
+      if (index === 0) {
+        k.hp = Math.min(effectiveStats(k).maxHp, k.hp + 10);
+        if (rng.float() < 0.5) k.buffs.attack += 2;
+        else k.buffs.defense += 2;
+        log(s, `${k.name} prays. Wounds close and a blessing settles on them.`);
+      } else {
+        gainGold(k, 25);
+        if (rng.float() < 0.4) {
+          k.hp = Math.max(1, k.hp - 6);
+          log(s, `${k.name} takes 25 gold - and the saint's curse burns for 6 damage.`);
+        } else log(s, `${k.name} pockets 25 gold from the shrine.`);
+      }
+      break;
+    case 'dice': {
+      if (index === 2) { log(s, `${k.name} walks away from the dice.`); break; }
+      const bet = index === 0 ? 10 : 30;
+      const me = rng.d6();
+      const them = rng.d6();
+      if (me > them) { gainGold(k, bet); log(s, `${k.name} throws ${me} against ${them} and wins ${bet} gold!`); }
+      else if (me < them) { k.gold -= bet; log(s, `${k.name} throws ${me} against ${them} and loses ${bet} gold.`); }
+      else log(s, `${k.name} and the drovers both throw ${me}. The bet is pushed.`);
+      break;
+    }
+    case 'traveler':
+      if (index === 0) {
+        k.gold -= 10;
+        const pool = ITEMS.filter((i) => i.kind === 'consumable' && i.tier <= 2);
+        log(s, `${k.name} helps the traveler. ${awardItem(k, rng.pick(pool))}`);
+      } else log(s, `${k.name} rides past.`);
+      break;
+    case 'wisp':
+      if (index === 0) {
+        if (rng.float() < 0.5) {
+          const options = reachableNodes(k.pos, 99).filter((id) => ['village', 'ruins', 'lair'].includes(node(id).type));
+          const to = rng.pick(options);
+          k.pos = to;
+          log(s, `The wisp leads ${k.name} through the fog to ${node(to).name}!`);
+        } else {
+          k.hp = Math.max(1, k.hp - 6);
+          log(s, `${k.name} is lost in the fog and stumbles through brambles (-6 HP).`);
+        }
+      } else log(s, `${k.name} keeps to the road.`);
+      break;
+    case 'hermit':
+      if (index === 0) {
+        k.gold -= 40;
+        log(s, `The hermit drills ${k.name} until dawn.`);
+        addRenown(s, k);
+      } else log(s, `${k.name} declines the hermit's offer.`);
+      break;
+  }
+  afterEncounter(s);
+}
+
 // ---------------------------------------------------------------- combat
 
 function startCombat(
@@ -371,7 +552,7 @@ function startCombat(
   let monster: MonsterFighter | null = null;
   let maxStaminaB: number;
   if (monsterId) {
-    monster = monsterStatsForDay(monsterId, s.day);
+    monster = monsterStatsForDay(monsterId, s.day, ea.foeAttack);
     maxStaminaB = getMonster(monsterId).stamina;
   } else {
     maxStaminaB = effectiveStats(s.players[b!]).maxStamina;
@@ -478,7 +659,7 @@ function killKnight(s: GameState, id: number, opts: { goldTo?: number; sealTo?: 
   const notes: string[] = [`${k.name} falls!`];
   if (lost > 0) {
     if (opts.goldTo !== undefined) {
-      s.players[opts.goldTo].gold += lost;
+      gainGold(s.players[opts.goldTo], lost);
       notes.push(`${s.players[opts.goldTo].name} takes ${lost} gold.`);
     } else notes.push(`${lost} gold is lost.`);
   }
@@ -511,6 +692,8 @@ function finishCombat(s: GameState): void {
     const winner = c.outcome === 'a' ? ka : kb;
     const loser = c.outcome === 'a' ? kb : ka;
     winner.kills += 1;
+    winner.duelsWon += 1;
+    addRenown(s, winner);
     s.pendingLoot = { winner: winner.id, loser: loser.id };
     s.combat = null;
     s.stage = 'pvpLoot';
@@ -526,6 +709,17 @@ function finishCombat(s: GameState): void {
     return;
   }
   ka.kills += 1;
+  if (c.kind === 'wild') {
+    const def = getMonster(c.monsterId!);
+    const rng = new Rng(s);
+    const gold = rng.int(def.goldMin, def.goldMax);
+    gainGold(ka, gold);
+    addRenown(s, ka);
+    const item = rng.float() < 0.6 ? randomLoot(s, def.lootTier) : null;
+    log(s, `${ka.name} defeats the ${def.name}! +${gold} gold.${item ? ' ' + awardItem(ka, item) : ''}`);
+    afterEncounter(s);
+    return;
+  }
   if (c.kind === 'guardian') {
     s.winner = ka.id;
     s.endReason = 'sanctum';
@@ -538,8 +732,9 @@ function finishCombat(s: GameState): void {
   const def = getMonster(c.monsterId!);
   const rng = new Rng(s);
   const gold = rng.int(def.goldMin, def.goldMax) + SEAL_GOLD_BONUS;
-  ka.gold += gold;
+  gainGold(ka, gold);
   ka.seals.push(nd.seal!);
+  addRenown(s, ka);
   const item = randomLoot(s, def.lootTier);
   log(s, `${ka.name} slays ${def.name}! Seal ${nd.seal! + 1} claimed, +${gold} gold. ${awardItem(ka, item)}`);
   afterEncounter(s);
@@ -762,6 +957,28 @@ export function applyAction(state: GameState, action: Action): GameState {
       } else killKnight(s, loser, { goldTo: winner });
       s.pendingLoot = null;
       s.stage = 'turnEnd';
+      return s;
+    }
+
+    case 'eventChoice': {
+      need(s.stage === 'event' && !!s.event, 'no event');
+      const why = eventOptionBlock(s, action.index);
+      need(why === null, why ?? '');
+      resolveEvent(s, action.index);
+      return s;
+    }
+
+    case 'chooseBoon': {
+      need(s.stage === 'levelUp' && !!s.boonChoices && s.boonChoices.includes(action.id), 'not on offer');
+      k.boons.push(action.id);
+      k.pendingBoons -= 1;
+      clampHp(k);
+      if (getBoon(action.id).effect.maxHp) k.hp += getBoon(action.id).effect.maxHp!;
+      clampHp(k);
+      log(s, `${k.name} levels up: ${getBoon(action.id).name} (${getBoon(action.id).desc}).`);
+      s.boonChoices = null;
+      if (k.pendingBoons > 0) offerBoons(s);
+      else s.stage = 'roll';
       return s;
     }
 

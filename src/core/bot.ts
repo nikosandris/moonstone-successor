@@ -4,7 +4,7 @@ import { getItem } from '../data/items';
 import { getMonster, GUARDIAN } from '../data/monsters';
 import { allowedChoices } from './combat';
 import {
-  actorId, combatFighters, knightFighter, monsterStatsForDay, sealCount, stealableSeals,
+  actorId, combatFighters, eventOptionBlock, knightFighter, monsterStatsForDay, sealCount, stealableSeals,
 } from './game';
 import { SANCTUM_ID, distancesFrom, node, reachable } from './graph';
 import { daysLeftInPhase, daysUntilFull, isSanctumOpen } from './moon';
@@ -86,11 +86,54 @@ export function botAction(s: GameState, side?: 'a' | 'b'): Action {
       const loser = s.pendingLoot!.loser;
       return { type: 'pvpLoot', take: stealableSeals(s, s.pendingLoot!.winner, loser).length > 0 ? 'seal' : 'gold' };
     }
+    case 'event':
+      return { type: 'eventChoice', index: eventChoice(s, k) };
+    case 'levelUp':
+      return { type: 'chooseBoon', id: chooseBoon(s, k) };
     case 'turnEnd':
       return { type: 'endTurn' };
     default:
       throw new Error('bot has nothing to do');
   }
+}
+
+// ---------------------------------------------------------------- events and level-ups
+
+function eventChoice(s: GameState, k: Knight): number {
+  const e = s.event!;
+  const ok = (i: number) => eventOptionBlock(s, i) === null;
+  const hpRatio = k.hp / effectiveStats(k).maxHp;
+  switch (e.id) {
+    case 'merchant': {
+      const item = getItem(String(e.data.item));
+      const cur = item.kind === 'weapon' ? k.weapon : item.kind === 'armor' ? k.armor : null;
+      const upgrade = item.kind === 'consumable' ? k.consumables.length < 3 : (item.bonus ?? 0) > (cur ? getItem(cur).bonus ?? 0 : -1);
+      return upgrade && ok(0) && k.gold - Number(e.data.price) >= 10 ? 0 : 1;
+    }
+    case 'ambush': {
+      const adv = advVsMonster(k, String(e.data.monster), s.day);
+      return adv >= 1 && hpRatio >= 0.45 ? 0 : 1;
+    }
+    case 'shrine':
+      return hpRatio < 0.75 ? 0 : 1;
+    case 'dice':
+      return k.gold >= 80 && ok(0) ? 0 : 2;
+    case 'traveler':
+      return k.gold >= 40 && k.consumables.length < 3 ? 0 : 1;
+    case 'wisp':
+      return hpRatio > 0.6 && sealCount(s, k.id) < CONFIG.sealsToEnter ? 0 : 1;
+    case 'hermit':
+      return k.gold >= 90 ? 0 : 1;
+    default:
+      return e.options.length - 1;
+  }
+}
+
+function chooseBoon(s: GameState, k: Knight): string {
+  const pref = ['might', 'bulwark', 'vigor', 'endurance', 'secondWind', 'feinter', 'fleetfoot', 'haggler'];
+  const offers = s.boonChoices!;
+  void k;
+  return [...offers].sort((a, b) => pref.indexOf(a) - pref.indexOf(b))[0];
 }
 
 // ---------------------------------------------------------------- movement

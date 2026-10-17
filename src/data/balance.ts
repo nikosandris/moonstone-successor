@@ -22,6 +22,12 @@ export const CONFIG = {
     trapMax: 10,
   },
   pvpHalfGold: 0.5,
+  roadEventChance: 0.5,
+  /** extra modifiers for a monster in its own strong / weak phase */
+  affinity: {
+    strong: { hpMult: 1.15, attack: 1 },
+    weak: { hpMult: 0.85, attack: -1 },
+  },
   deathGoldLoss: 0.5,
 };
 

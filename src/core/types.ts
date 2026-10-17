@@ -67,6 +67,9 @@ export interface MonsterDef {
   goldMax: number;
   lootTier: 1 | 2 | 3 | 4;
   hint: string;
+  /** the phase in which this monster is at its strongest / weakest (on top of the general moon effect) */
+  strongPhase?: MoonPhase;
+  weakPhase?: MoonPhase;
   /** arena: reaction window in ms between the start of the wind-up and the impact */
   tellMs: number;
   /** arena: silhouette family and body colour */
@@ -85,6 +88,16 @@ export interface ScarEffect {
   feintExtra?: number;
   guardRegen?: number; // added to stamina restored by Guard (negative = worse)
   shopPct?: number; // % added to shop prices
+  strikeExtra?: number; // added to Strike stamina cost
+  foeAttack?: number; // added to the Attack of monsters this knight fights
+}
+
+/** Permanent level-up reward chosen from three offers. Uses the same effect fields as scars. */
+export interface BoonDef {
+  id: string;
+  name: string;
+  desc: string;
+  effect: ScarEffect;
 }
 
 export interface ScarDef {
@@ -117,6 +130,13 @@ export interface Knight {
   downed: boolean;
   deaths: number;
   kills: number;
+  duelsWon: number;
+  /** victories counted toward level-ups */
+  renown: number;
+  boons: string[];
+  /** level-ups earned but not yet chosen (offered at the start of the knight's turn) */
+  pendingBoons: number;
+  goldEarned: number;
 }
 
 export type Stage =
@@ -126,8 +146,25 @@ export type Stage =
   | 'combat'
   | 'pvpOffer'
   | 'pvpLoot'
+  | 'event'
+  | 'levelUp'
   | 'turnEnd'
   | 'gameOver';
+
+export interface EventOption {
+  label: string;
+  /** short hint of the consequence shown under the button */
+  hint: string;
+}
+
+export interface ActiveEvent {
+  id: string;
+  title: string;
+  text: string;
+  options: EventOption[];
+  /** event-specific data rolled when the event appears (e.g. merchant item, ambush monster) */
+  data: Record<string, string | number>;
+}
 
 export interface MonsterFighter {
   id: string;
@@ -139,7 +176,8 @@ export interface MonsterFighter {
 }
 
 export interface Combat {
-  kind: 'monster' | 'guardian' | 'pvp';
+  /** wild = wandering monster from a road event (no Seal) */
+  kind: 'monster' | 'wild' | 'guardian' | 'pvp';
   /** knight id acting (current player) */
   a: number;
   /** knight id of rival (pvp only) */
@@ -190,6 +228,9 @@ export interface GameState {
   pendingLoot: PendingLoot | null;
   /** knights on the node who can be challenged */
   challengeable: number[];
+  event: ActiveEvent | null;
+  /** boon ids currently offered on a level-up */
+  boonChoices: string[] | null;
   log: LogEntry[];
   winner: number | null;
   endReason: 'sanctum' | 'dayCap' | null;
@@ -214,4 +255,6 @@ export type Action =
   | { type: 'choose'; side: 'a' | 'b'; choice: Choice }
   | { type: 'continue' }
   | { type: 'pvpLoot'; take: 'seal' | 'gold' }
+  | { type: 'eventChoice'; index: number }
+  | { type: 'chooseBoon'; id: string }
   | { type: 'endTurn' };

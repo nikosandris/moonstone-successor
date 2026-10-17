@@ -38,6 +38,8 @@ const wins = Array(PLAYERS).fill(0);
 const winsBySanctum = Array(PLAYERS).fill(0);
 let deaths = 0;
 let kills = 0;
+let boons = 0;
+let duels = 0;
 const itemUse: Record<string, number> = {};
 const dayHist: Record<string, number> = {};
 for (let g = 0; g < GAMES; g++) {
@@ -47,7 +49,7 @@ for (let g = 0; g < GAMES; g++) {
   daysSum += s.day;
   wins[s.winner!]++;
   if (s.endReason === 'sanctum') winsBySanctum[s.winner!]++;
-  for (const p of s.players) { deaths += p.deaths; kills += p.kills; }
+  for (const p of s.players) { deaths += p.deaths; kills += p.kills; boons += p.boons.length; duels += p.duelsWon; }
   for (const [id, n] of Object.entries(s.stats.itemUse)) itemUse[id] = (itemUse[id] ?? 0) + n;
   const bucket = `${Math.floor((s.day - 1) / 4) * 4 + 1}-${Math.floor((s.day - 1) / 4) * 4 + 4}`;
   dayHist[bucket] = (dayHist[bucket] ?? 0) + 1;
@@ -95,6 +97,8 @@ ${Object.entries(dayHist).map(([k, v]) => `| ${k} | ${v} |`).join('\n')}
 
 - Average deaths per knight per game: ${(deaths / (GAMES * PLAYERS)).toFixed(2)}
 - Average fights won per knight per game: ${(kills / (GAMES * PLAYERS)).toFixed(2)} (monster fights and duels)
+- Average duels won per knight per game: ${(duels / (GAMES * PLAYERS)).toFixed(2)}
+- Average level-ups (boons) per knight per game: ${(boons / (GAMES * PLAYERS)).toFixed(2)}
 
 ### Item usage
 

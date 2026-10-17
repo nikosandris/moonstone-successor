@@ -25,3 +25,7 @@ One line each: decision - reasoning.
 - M4: Hit stop is done by scaling scene time and tweens to 3% for 50-110 ms on a real-time `setTimeout` - freezes everything (timers included) without touching game state.
 - M4: All audio is synthesised (oscillators + filtered noise, `src/ui/audio.ts`); the AudioContext is created on the first pointer/key press to satisfy autoplay rules. Ambient = wandering-band wind + breathing low drone.
 - M4: Sanctum opening gets a full-screen cinematic (darken, rising full moon, choir-like sting, shake); other phase changes only get a banner + chime so the big moment stays special.
+- M5: Extra monsters appear as road ambushes (4 "wanderers": no Seal, gold + loot + renown) so lair difficulty and seat balance stay intact while there are 9 distinct foes.
+- M5: Every monster has its own strong and weak moon phase (Dire Wolf strongest at Full, as in the original's werewolf-ish wolves) on top of the general moon effect.
+- M5: Roads trigger one of 7 weighted events 50% of the time; the bone-dice game is a fair bet (ties push) as a nod to the original's tavern gambling.
+- M5: Renown/level-ups (wins at 2, 4, 7, 11, 16) with a choice of 3 boons, offered at the start of the knight's own turn - borrows the roguelite "pick 1 of 3" hook and the original's XP-into-attributes; Warden raised to HP 66 / ATK 10 to keep game length in range.

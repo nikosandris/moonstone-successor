@@ -63,3 +63,19 @@
 
 **Known issues**
 - I cannot listen to the audio in a headless browser: sounds are verified to run without errors, not judged by ear.
+
+## M5 - Content (done)
+
+**Changed**
+- 9 monster types: 4 lair guardians, 4 road wanderers (Road Bandit, Giant Spider, Marsh Serpent, Bone Golem - new silhouettes: armoured, spider, serpent, golem) and the Hollow Warden. Each has its own weights/opener/habit, telegraph speed and a strong/weak moon phase.
+- 7 road events with choices (50% chance on roads): Wandering Merchant, Ambush!, Roadside Shrine, Bone Dice, Wounded Traveler, Will-o'-the-Wisp, Old Sword-Hermit.
+- Renown and level-ups: victories (lairs, ambushes, duels, hermit training) build renown; at 2/4/7/11/16 the knight picks 1 of 3 boons (8 boons).
+- 4 new scars (15 total): Burned Hands, Frostbitten, Grim Veteran, Haunted.
+- End-of-game summary: seals, gold, fights won, duels, deaths, levels, boons, scars per knight, plus awards (Most Feared, Most Scarred, Deepest Purse).
+- Panel shows renown, next level-up and boons; node info and arena show monster moon affinity.
+
+**Verification**
+- `npm test`: 118 pass (new: content counts, all events through all options, blocked options, ambush rewards, dice payouts, hermit, level-up flow, boon/scar effects, Haunted in a real fight, moon affinity).
+- `npm run build`: 0 errors.
+- `npm run sim` (1000 games): Sanctum 80.0%, average 22.6 days, seats 26.7 / 25.5 / 23.5 / 24.3% (max 26.7%). 1.82 level-ups per knight per game.
+- Playwright desktop + 800x360 touch: merchant, wisp, traveler, shrine, hermit events resolved by tapping; ambush fought in the arena to victory; level-up modal; summary screen. 0 console errors. Screenshots inspected.
