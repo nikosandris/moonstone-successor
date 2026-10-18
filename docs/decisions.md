@@ -70,3 +70,9 @@ One line each: decision - reasoning.
 - Combat telegraphs are now unmistakable: badge over the foe ("Strike or Feint?" then STRIKE/GUARD/FEINT with the counter), coloured aura ring and strong glow, exaggerated procedural wind-ups.
 - Illustrated codex (src/ui/codex.ts) replaces the text rules: goal, turn, places, the combat triangle diagram, reading tells, moon, falling/duels/renown.
 - Greek language (src/ui/i18n.ts + i18n_el.ts): UI, data names/descriptions, and chronicle lines translated by template; EB Garamond supplies Greek glyphs.
+
+## Premium HUD pass, realistic arena, adaptive performance
+- Panels: frosted glass (off on low graphics: a full-screen blur per frame is costly), double gold hairlines, filigree SVG corners; secondary text in Cormorant Garamond italic, names and day in mixed case; metal-edged enamel buttons; moon disc with halo and visible craters at new moon.
+- Tutorial spotlights on map places follow the camera while it glides into position.
+- Arena stages reuse the map's scanned ground, HDRI and models (pines, bushes, cliffs, the cave mouth, Stonehenge behind the Warden).
+- src/ui/gfx.ts: one AO setup for map and arena (skips glows and helper geometry) and a FrameGovernor that lowers internal resolution, then switches AO off, when frames run long, and climbs back when there is headroom.

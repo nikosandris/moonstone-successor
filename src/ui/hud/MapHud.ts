@@ -86,6 +86,8 @@ export class MapHud {
   private lastLogLen = -1;
   private lastLogLang = '';
   private dieTimer = 0;
+  private tutTimer = 0;
+  private tutFollow = 0;
   private lastTurnKey = '';
   private chronOpen = false;
   private heroOpen = true;
@@ -109,6 +111,7 @@ export class MapHud {
   destroy(): void {
     window.removeEventListener('resize', this.onResize);
     window.clearInterval(this.dieTimer);
+    window.clearTimeout(this.tutTimer);
     this.root.remove();
   }
 
@@ -489,10 +492,16 @@ export class MapHud {
     return el && el.offsetParent ? el.getBoundingClientRect() : null;
   }
 
-  private renderTutorial(step: TutorialStep | null, index: number, total: number): void {
+  private renderTutorial(step: TutorialStep | null, index: number, total: number, follow = false): void {
+    window.clearTimeout(this.tutTimer);
     this.tut.innerHTML = '';
     this.tut.className = step ? 'mh-tut on' : 'mh-tut';
     if (!step) return;
+    // places move on screen while the camera glides: keep the spotlight on them for a moment
+    if (step.target.startsWith('node:') || step.target === 'map') {
+      if (!follow) this.tutFollow = 0;
+      if (this.tutFollow++ < 12) this.tutTimer = window.setTimeout(() => this.renderTutorial(step, index, total, true), 250);
+    }
     const R = this.root.getBoundingClientRect();
     const tr = this.targetRect(step.target);
     const pad = 6;

@@ -259,6 +259,7 @@ export class GameScene extends Phaser.Scene {
   private openMap3d(): void {
     if (!this.sys || !this.sys.isActive() || this.map3d) return;
     this.mapLow = lowGraphics();
+    document.documentElement.classList.toggle('lowgfx', this.mapLow);
     try {
       this.map3d = new MapWorld3D({
         onNodeClick: (id) => this.onNodeTap(id),
