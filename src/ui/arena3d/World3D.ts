@@ -9,7 +9,7 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import type { MoonPhase } from '../../core/types';
 import { drawFog, drawMoon } from '../art/textures';
 import { cloneProp, type PropFile } from './assets3d';
-import { FrameGovernor, makeAO } from '../gfx';
+import { FrameGovernor, makeAO, sharedRenderer } from '../gfx';
 import { ModelScatter, hasModel, mapEnv, mapTexture, placeModel, type MapModel } from '../map3d/mapAssets';
 import { fbm, splatMaterial } from '../map3d/terrain';
 import { lowGraphics } from '../settings';
@@ -81,12 +81,9 @@ export class World3D {
   private zoomTarget = 1;
 
   constructor(readonly canvas: HTMLCanvasElement, stage: Stage3D, phase: MoonPhase, seed: number) {
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-    this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer = sharedRenderer();
+    void canvas;
     this.renderer.toneMappingExposure = phase === 'full' ? 1.15 : phase === 'new' ? 0.85 : 1.0;
-    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
 
     this.buildStage(stage, phase, seed);
     this.scene.add(this.fx.group);
@@ -484,7 +481,7 @@ export class World3D {
     });
     this.envMap?.dispose();
     this.composer.dispose();
-    this.renderer.dispose();
+    // the renderer is shared with the map: it stays
   }
 }
 

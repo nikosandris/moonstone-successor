@@ -19,6 +19,7 @@ import '@fontsource/eb-garamond/greek-500-italic.css';
 import './ui/hud/hud.css';
 import { ArenaScene } from './ui/arena/ArenaScene';
 import { GameScene } from './ui/GameScene';
+import { webgl2Available } from './ui/arena3d/assets3d';
 import { audio } from './ui/audio';
 import { showSetup } from './ui/setup';
 import { H, W } from './ui/theme';
@@ -31,7 +32,9 @@ function start(players: PlayerSetup[], seed: number, resume?: GameState): void {
   audio.setAmbient(true);
   game?.destroy(true);
   game = new Phaser.Game({
-    type: Phaser.AUTO,
+    // with WebGL2 the 3D map and arena draw everything; Phaser's own canvas only serves the 2D fallbacks,
+    // so it stays on the 2D canvas renderer instead of holding a second WebGL context
+    type: webgl2Available() ? Phaser.CANVAS : Phaser.AUTO,
     parent: 'game',
     width: W,
     height: H,

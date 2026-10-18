@@ -77,9 +77,59 @@ export class FrameGovernor {
     }
   }
 
+  /** Re-assert this view's resolution after another view used the shared renderer. */
+  reapply(): void {
+    this.apply();
+  }
+
   private apply(): void {
     this.renderer.setPixelRatio(RATIOS[this.level]);
     this.composer?.setPixelRatio(RATIOS[this.level]);
     this.onResize();
   }
+}
+
+let shared: THREE.WebGLRenderer | null = null;
+
+/**
+ * The one WebGL renderer (and canvas) shared by the map and the arena. One context means every model
+ * and texture lives in GPU memory once - phones kill tabs that hold two copies.
+ */
+export function sharedRenderer(): THREE.WebGLRenderer {
+  if (!shared) {
+    shared = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
+    shared.shadowMap.enabled = true;
+    shared.shadowMap.type = THREE.PCFSoftShadowMap;
+    shared.toneMapping = THREE.ACESFilmicToneMapping;
+    shared.outputColorSpace = THREE.SRGBColorSpace;
+    shared.domElement.style.touchAction = 'none';
+  }
+  return shared;
+}
+
+/** Shrink every texture under `root` to at most `max` pixels (phones: GPU memory is the limit). */
+export function capTextures(root: THREE.Object3D, max: number): void {
+  const seen = new Set<THREE.Texture>();
+  root.traverse((o) => {
+    const mats = (o as THREE.Mesh).material;
+    if (!mats) return;
+    for (const m of Array.isArray(mats) ? mats : [mats]) {
+      for (const v of Object.values(m)) if (v && (v as THREE.Texture).isTexture) capTexture(v as THREE.Texture, max, seen);
+    }
+  });
+}
+
+export function capTexture(t: THREE.Texture, max: number, seen = new Set<THREE.Texture>()): void {
+  if (seen.has(t)) return;
+  seen.add(t);
+  const img = t.image as { width?: number; height?: number } | undefined;
+  if (!img || !img.width || !img.height || (img.width <= max && img.height <= max)) return;
+  const k = max / Math.max(img.width, img.height);
+  const c = document.createElement('canvas');
+  c.width = Math.max(1, Math.round(img.width * k));
+  c.height = Math.max(1, Math.round(img.height * k));
+  c.getContext('2d')!.drawImage(t.image as CanvasImageSource, 0, 0, c.width, c.height);
+  (t.image as { close?: () => void }).close?.();
+  t.image = c;
+  t.needsUpdate = true;
 }

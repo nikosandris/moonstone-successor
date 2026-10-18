@@ -14,6 +14,7 @@ import { t, td, tlog, tn } from '../i18n';
 import { getSettings, reactionScale } from '../settings';
 import { hex } from '../theme';
 import { icon } from '../hud/icons';
+import { sharedRenderer } from '../gfx';
 import { showCodex } from '../codex';
 import { Actor3D, type ActorLook } from './Actor3D';
 import { World3D, type Stage3D } from './World3D';
@@ -70,12 +71,12 @@ const CSS = `
 .a3d-title .mb-title{font-size:1.05em}
 .a3d-title .hint{font:italic .78em/1.3 var(--text);color:#f0d9b0;text-shadow:0 1px 3px #000}
 .a3d-title .aff{font:italic .7em var(--text);color:#ff9d8a;text-shadow:0 1px 3px #000}
-.a3d-banner{position:absolute;top:23%;left:0;right:0;opacity:0;transform:scale(1.25);filter:blur(4px);transition:opacity .22s,transform .3s cubic-bezier(.2,1.4,.4,1),filter .25s}
+.a3d-banner{position:absolute;top:13%;pointer-events:none;z-index:3;left:0;right:0;opacity:0;transform:scale(1.25);filter:blur(4px);transition:opacity .22s,transform .3s cubic-bezier(.2,1.4,.4,1),filter .25s}
 .a3d-banner.show{opacity:1;transform:scale(1);filter:blur(0)}
-.a3d-banner .mb-banner{font-size:2.3em}
-.a3d-banner.perfect .mb-banner{font-size:3.4em}
+.a3d-banner .mb-banner{font-size:1.7em}
+.a3d-banner.perfect .mb-banner{font-size:2.6em}
 .a3d-log{position:absolute;bottom:12.4em;left:50%;transform:translateX(-50%);width:34em;text-align:center;font:italic .82em/1.35 var(--text);color:#e9dfcc;text-shadow:0 1px 3px #000,0 0 8px #000}
-.a3d-intent{position:absolute;display:flex;align-items:center;gap:.55em;padding:.45em 1.1em .45em .45em;border-radius:2em;transform:translate(-50%,-100%) scale(.8);opacity:0;pointer-events:none;transition:opacity .15s,transform .2s cubic-bezier(.2,1.6,.4,1);white-space:nowrap;background:linear-gradient(#0d0a12f0,#0d0a12d0);box-shadow:0 0 0 2px var(--k),0 0 24px var(--k),0 8px 20px #000c}
+.a3d-intent{position:absolute;z-index:6;display:flex;align-items:center;gap:.55em;padding:.45em 1.1em .45em .45em;border-radius:2em;transform:translate(-50%,-100%) scale(.8);opacity:0;pointer-events:none;transition:opacity .15s,transform .2s cubic-bezier(.2,1.6,.4,1);white-space:nowrap;background:linear-gradient(#0d0a12f0,#0d0a12d0);box-shadow:0 0 0 2px var(--k),0 0 24px var(--k),0 8px 20px #000c}
 .a3d-intent.on{opacity:1;transform:translate(-50%,-100%) scale(1)}
 .a3d-intent .ic{width:2.3em;height:2.3em;border-radius:50%;display:grid;place-items:center;color:#fff;background:radial-gradient(circle at 50% 35%,var(--k),#000 120%);box-shadow:0 0 0 2px #000,0 0 12px var(--k)}
 .a3d-intent .ic .ico{width:62%;height:62%}
@@ -169,7 +170,7 @@ export class Arena3D {
     const url = Number(new URLSearchParams(window.location.search).get('speed')) || 1;
     this.speed = getSettings().animSpeed * url;
     this.root = el('div', 'a3d-root');
-    const canvas = el('canvas');
+    const canvas = sharedRenderer().domElement;
     this.hud = el('div', 'a3d-hud');
     this.root.append(canvas, this.hud);
     document.body.appendChild(this.root);
@@ -228,11 +229,11 @@ export class Arena3D {
     return side === 'a' ? this.a : this.b;
   }
 
-  /** Overlay exactly covers the Phaser canvas (which keeps its 16:9 letterbox). */
+  /** The fight fills the window; its type scale fits the narrower of the two dimensions. */
   private layout(): void {
-    const r = this.host.canvas().getBoundingClientRect();
-    Object.assign(this.root.style, { left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px`, fontSize: `${(r.height / 576) * 16}px` });
-    this.world.resize(Math.max(1, Math.round(r.width)), Math.max(1, Math.round(r.height)));
+    const w = window.innerWidth, h = window.innerHeight;
+    Object.assign(this.root.style, { left: '0px', top: '0px', width: `${w}px`, height: `${h}px`, fontSize: `${Math.min(w / 1024, h / 576) * 16}px` });
+    this.world.resize(Math.max(1, w), Math.max(1, h));
   }
 
   private after(ms: number, fn: () => void): void {
@@ -516,6 +517,11 @@ export class Arena3D {
     this.timers = [];
     this.phase = 'window';
     this.windowT = 0;
+    // nothing may cover the foe while it winds up: clear banners, numbers and the last round's report
+    this.els.banner.className = 'a3d-banner';
+    this.els.banner.innerHTML = '';
+    this.hud.querySelectorAll('.a3d-pop').forEach((p) => p.remove());
+    this.els.log.textContent = '';
     if (c.kind !== 'pvp') {
       this.intent.b = previewMonsterChoice(this.s) ?? 'guard';
       this.windowMs = getMonster(c.monsterId!).tellMs * reactionScale();

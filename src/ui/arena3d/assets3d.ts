@@ -4,6 +4,8 @@ import * as THREE from 'three';
 import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
+import { capTextures } from '../gfx';
+import { lowGraphics } from '../settings';
 
 const BASE = `${import.meta.env.BASE_URL}assets/3d/`;
 const SF_BASE = `${import.meta.env.BASE_URL}assets/sf/`;
@@ -43,7 +45,11 @@ const sfLoading = new Map<string, Promise<GLTF | null>>();
 export function preloadSf(name: SfFile | SfProp): Promise<GLTF | null> {
   let p = sfLoading.get(name);
   if (!p) {
-    p = load(name, SF_BASE).then((g) => { sfCache.set(name, g); return g; }, () => { sfLoading.delete(name); return null; });
+    p = load(name, SF_BASE).then((g) => {
+      if (lowGraphics()) capTextures(g.scene, 512);
+      sfCache.set(name, g);
+      return g;
+    }, () => { sfLoading.delete(name); return null; });
     sfLoading.set(name, p);
   }
   return p;

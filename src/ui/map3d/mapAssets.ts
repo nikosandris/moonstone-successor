@@ -4,6 +4,8 @@ import * as THREE from 'three';
 import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js';
 import { HDRLoader } from 'three/addons/loaders/HDRLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+import { capTexture, capTextures } from '../gfx';
+import { lowGraphics } from '../settings';
 
 const BASE = import.meta.env.BASE_URL;
 export const TERRAIN_LAYERS = ['grass', 'dirt', 'rock', 'moss', 'mud'] as const;
@@ -23,6 +25,7 @@ let loading: Promise<void> | null = null;
  * becomes alpha-tested (blending breaks with instancing and depth sorting).
  */
 function prepare(scene: THREE.Object3D): THREE.Object3D {
+  if (lowGraphics()) capTextures(scene, 512);
   scene.traverse((o) => {
     const mesh = o as THREE.Mesh;
     if (!mesh.isMesh) return;
@@ -60,6 +63,7 @@ export function loadMapAssets(onProgress?: (f: number) => void): Promise<void> {
         t.wrapS = t.wrapT = THREE.RepeatWrapping;
         t.anisotropy = 8;
         if (kind === 'diff') t.colorSpace = THREE.SRGBColorSpace;
+        if (lowGraphics()) capTexture(t, 512);
         textures.set(`${layer}_${kind}`, t);
       }));
     }
@@ -68,13 +72,14 @@ export function loadMapAssets(onProgress?: (f: number) => void): Promise<void> {
     t.wrapS = t.wrapT = THREE.RepeatWrapping;
     textures.set('water', t);
   }));
-  jobs.push(() => new HDRLoader().loadAsync(`${BASE}assets/ph/night.hdr`).then((t) => {
+  // a floating-point sky is the heaviest single texture: phones light with a synthetic environment instead
+  if (!lowGraphics()) jobs.push(() => new HDRLoader().loadAsync(`${BASE}assets/ph/night.hdr`).then((t) => {
     t.mapping = THREE.EquirectangularReflectionMapping;
     env = t;
   }));
   const glb = (url: string, name: string) => () => gl.loadAsync(url).then((g: GLTF) => { models.set(name, prepare(g.scene)); });
   for (const m of PH_MODELS) jobs.push(glb(`${BASE}assets/ph/${m}.glb`, m));
-  for (const m of SF_MODELS) jobs.push(glb(`${BASE}assets/sf/${m}.glb`, m));
+  for (const m of SF_MODELS) if (!(lowGraphics() && m === 'mill')) jobs.push(glb(`${BASE}assets/sf/${m}.glb`, m));
   let done = 0;
   loading = (async () => {
     // a few at a time: fast on good connections without starving the rest of the page

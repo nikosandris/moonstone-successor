@@ -10,6 +10,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import type { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
 import { Water } from 'three/addons/objects/Water.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { shortestPath } from '../../core/graph';
 import { isSanctumOpen, phaseForDay } from '../../core/moon';
 import type { BoardNode, GameState, MoonPhase } from '../../core/types';
@@ -19,10 +20,10 @@ import { Actor3D } from '../arena3d/Actor3D';
 import { MONSTER_LOOK } from '../arena3d/Arena3D';
 import { sfReady } from '../arena3d/assets3d';
 import { getLang, t, tn } from '../i18n';
-import { FrameGovernor, makeAO } from '../gfx';
+import { FrameGovernor, makeAO, sharedRenderer } from '../gfx';
 import { lowGraphics } from '../settings';
 import { SEAL_COLORS } from '../theme';
-import { ModelScatter, mapEnv, mapTexture, placeModel, type MapModel } from './mapAssets';
+import { ModelScatter, hasModel, mapEnv, mapTexture, placeModel, type MapModel } from './mapAssets';
 import { WATER_Y, buildTerrain, fbm, heightAt, islandMask, nodeXZ, roadDist, roadPath } from './terrain';
 
 export interface MapHost {
@@ -143,7 +144,7 @@ const PHASE_LIGHT: Record<MoonPhase, { key: number; keyI: number; hemi: number; 
 
 export class MapWorld3D {
   readonly root = document.createElement('div');
-  private canvas = document.createElement('canvas');
+  private canvas: HTMLCanvasElement;
   private labels = document.createElement('div');
   private renderer: THREE.WebGLRenderer;
   private composer: EffectComposer;
@@ -192,20 +193,15 @@ export class MapWorld3D {
   constructor(private host: MapHost) {
     this.root.className = 'm3d-root';
     this.labels.className = 'm3d-labels';
+    this.renderer = sharedRenderer();
+    this.canvas = this.renderer.domElement;
     this.root.append(this.canvas, this.labels);
     this.mobile = lowGraphics();
-    this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: false, powerPreference: 'high-performance' });
-    this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
 
     const env = mapEnv();
-    if (env) {
-      const pmrem = new THREE.PMREMGenerator(this.renderer);
-      this.scene.environment = pmrem.fromEquirectangular(env).texture;
-      pmrem.dispose();
-    }
+    const pmrem = new THREE.PMREMGenerator(this.renderer);
+    this.scene.environment = env ? pmrem.fromEquirectangular(env).texture : pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    pmrem.dispose();
     this.scene.fog = new THREE.FogExp2(0x18224a, 0.011);
 
     this.composer = new EffectComposer(this.renderer);
@@ -221,7 +217,7 @@ export class MapWorld3D {
 
     this.buildLights();
     this.buildSea();
-    this.scene.add(buildTerrain());
+    this.scene.add(buildTerrain(this.mobile));
     this.buildNature();
     this.buildPlaces();
     this.buildAmbience();
@@ -421,6 +417,7 @@ export class MapWorld3D {
         ];
         for (const [name, ang, rad, size] of set) {
           const q = at(ang, rad);
+          if (name === 'mill' && !hasModel('mill')) { this.put('house1', 1.9, q.x, q.z, face + ang + Math.PI); continue; }
           this.put(name, size, q.x, q.z, face + ang + Math.PI);
         }
         const w = at(-1.9, 1.6);
@@ -854,9 +851,17 @@ export class MapWorld3D {
   // ---------------------------------------------------------------- frame loop
 
   setPaused(p: boolean): void {
+    if (p === this.paused) return;
     this.paused = p;
     this.root.style.visibility = p ? 'hidden' : '';
-    if (!p) this.clock.getDelta();
+    if (!p) {
+      // the arena borrowed the shared canvas: take it back and restore this view's settings
+      if (this.canvas.parentElement !== this.root) this.root.insertBefore(this.canvas, this.labels);
+      this.renderer.shadowMap.needsUpdate = true;
+      this.governor.reapply();
+      if (this.view) this.applyPhase(phaseForDay(this.view.state.day), isSanctumOpen(this.view.state.day));
+      this.clock.getDelta();
+    }
   }
 
   private resize(): void {
@@ -972,7 +977,7 @@ export class MapWorld3D {
     for (const pw of this.pawns) pw.actor.dispose();
     for (const pl of this.places) pl.monster?.dispose();
     this.composer.dispose();
-    this.renderer.dispose();
+    // the renderer is shared with the arena and outlives the board
     this.root.remove();
   }
 }

@@ -149,8 +149,8 @@ function splatAt(x: number, z: number, h: number, slope: number): [number, numbe
   return [dirt, rock, moss * (1 - dirt) * (1 - rock), mud];
 }
 
-export function buildTerrain(): THREE.Mesh {
-  const geo = new THREE.PlaneGeometry(W, D, SEG_X, SEG_Z);
+export function buildTerrain(low = false): THREE.Mesh {
+  const geo = new THREE.PlaneGeometry(W, D, low ? 200 : SEG_X, low ? 138 : SEG_Z);
   geo.rotateX(-Math.PI / 2);
   const pos = geo.getAttribute('position') as THREE.BufferAttribute;
   for (let i = 0; i < pos.count; i++) pos.setY(i, heightAt(pos.getX(i), pos.getZ(i)));

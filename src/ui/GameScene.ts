@@ -324,6 +324,8 @@ export class GameScene extends Phaser.Scene {
     }
     const arena = s.stage === 'combat' && this.realtimeMode() !== 'classic';
     this.syncArena(arena);
+    // the full-screen 3D fight covers the board; its HUD would only peek out around the edges
+    this.hud.setVisible(!(s.stage === 'combat' && this.realtimeMode() === 'arena3d'));
     if (s.stage === 'combat' && !arena) this.drawCombat();
     const tut = this.tutorialStep();
     this.hud.render(s, { justRolled: this.justRolled, tutorial: tut ? tut.step : null, tutIndex: this.tutStep, tutTotal: tut ? tut.total : 0, actorBot: this.actor.bot });
