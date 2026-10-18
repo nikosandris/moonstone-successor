@@ -10,9 +10,21 @@
   <a href="docs/rules.md">Rules</a>
 </p>
 
-| The board | Real-time 3D duels | Premium HUD |
-| --- | --- | --- |
-| ![Map and HUD](docs/map-and-ui.jpg) | ![Combat arena](docs/realistic-models.jpg) | ![HUD panels](docs/premium-pass.jpg) |
+### Real-time 3D duels: read the monster, answer in time
+
+| The monster winds up... | ...and shows its move: red = Strike, answer with Guard |
+| --- | --- |
+| ![Duel: reading the wind-up](docs/screens/duel-read.jpg) | ![Duel: a Strike telegraph](docs/screens/duel-strike.jpg) |
+
+### The board
+
+| Full-screen HUD | Close up |
+| --- | --- |
+| ![The board with the HUD](docs/screens/board-hud.jpg) | ![A close look at the board](docs/screens/closeup.jpg) |
+
+| Setup (English / Ελληνικά) |
+| --- |
+| ![Setup screen](docs/screens/setup.jpg) |
 
 A dark-fantasy hot-seat board adventure with real-time 3D duels, for 2-4 knights on one device, in English or Greek. It is a spiritual successor to the 1991 Amiga classic *Moonstone: A Hard Days Knight*, using original names, rules, art and sound. The terrain materials, night sky and nature models are CC0 from Poly Haven; buildings, trees, monsters and the knight are CC-BY models from Sketchfab; icons come from game-icons.net (see [CREDITS.md](CREDITS.md)). All sounds are synthesised in code.
 

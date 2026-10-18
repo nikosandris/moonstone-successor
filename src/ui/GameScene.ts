@@ -18,7 +18,7 @@ import {
 import { generateTextures } from './art/textures';
 import { audio } from './audio';
 import { Arena3D } from './arena3d/Arena3D';
-import { is3dReady, preload3d, preloadAllSf, webgl2Available } from './arena3d/assets3d';
+import { is3dReady, preload3d, preloadAllSf, preloadSf, sfForFight, sfReady, webgl2Available } from './arena3d/assets3d';
 import { loadMapAssets } from './map3d/mapAssets';
 import { onContextChange } from './gfx';
 import { MapWorld3D } from './map3d/MapWorld3D';
@@ -77,6 +77,8 @@ export class GameScene extends Phaser.Scene {
   private sanctumGlow: Phaser.GameObjects.Image | null = null;
   private lastPos: number[] = [];
   private justRolled = false;
+  private sfWaiting = false;
+  private sfTried = new Set<string>();
   private tutStep = -1;
   private hud!: MapHud;
   /** the 3D diorama board; null until its models load, or when WebGL2 is unavailable (2D map then) */
@@ -357,6 +359,18 @@ export class GameScene extends Phaser.Scene {
     const host = { getState: () => this.state, dispatch: (a: Action) => this.dispatch(a), canvas: () => this.game.canvas };
     const active2d = this.scene.isActive('Arena') || this.scene.isPaused('Arena');
     if (on && mode === 'arena3d') {
+      // the realistic models load in the background after the map: a fight that starts before its
+      // fighters arrive waits for them (one attempt) rather than opening with the stand-in figures
+      const missing = sfForFight(this.state.combat?.monsterId).filter((n) => !sfReady(n) && !this.sfTried.has(n));
+      if (missing.length && !Arena3D.isOpen()) {
+        this.input.enabled = false;
+        if (!this.sfWaiting) {
+          this.sfWaiting = true;
+          for (const n of missing) this.sfTried.add(n);
+          void Promise.all(missing.map((n) => preloadSf(n))).then(() => { this.sfWaiting = false; this.render(); });
+        }
+        return;
+      }
       if (!Arena3D.isOpen()) Arena3D.open(host);
     } else if (Arena3D.isOpen()) Arena3D.closeCurrent();
     if (on && mode === 'arena' && !active2d) {

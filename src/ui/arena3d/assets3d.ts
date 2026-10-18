@@ -60,6 +60,13 @@ export async function preloadAllSf(): Promise<void> {
   for (const n of [...SF_PROPS, ...SF_FILES]) await preloadSf(n);
 }
 
+/** The realistic models a fight needs: the knight, its weapons and the monster (if it has one). */
+export function sfForFight(monsterId: string | null | undefined): (SfFile | SfProp)[] {
+  const need: (SfFile | SfProp)[] = ['knight', ...SF_PROPS];
+  if (monsterId && isSf(monsterId)) need.push(monsterId);
+  return need;
+}
+
 export function isSf(name: string): name is SfFile {
   return (SF_FILES as readonly string[]).includes(name);
 }
