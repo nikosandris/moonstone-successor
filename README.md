@@ -1,6 +1,20 @@
 # Moonblood
 
-A dark-fantasy hot-seat board adventure with real-time 3D duels, for 2-4 knights on one device. It is a spiritual successor to the 1991 Amiga classic *Moonstone: A Hard Days Knight*, using original names, rules, art and sound. The 3D arena uses CC0 KayKit models; icons come from game-icons.net and the fonts are Cinzel and Spectral (see [CREDITS.md](CREDITS.md)). The terrain, map art, moon and all sounds are generated in code.
+<p align="center">
+  <img src="docs/map-overview.jpg" alt="The realistic 3D island board at night" width="100%">
+</p>
+
+<p align="center">
+  <a href="https://nikosandris.github.io/moonstone-successor/"><b>▶ Play in the browser</b></a> ·
+  <a href="#run-locally">Run locally</a> ·
+  <a href="docs/rules.md">Rules</a>
+</p>
+
+| The board | Real-time 3D duels | Premium HUD |
+| --- | --- | --- |
+| ![Map and HUD](docs/map-and-ui.jpg) | ![Combat arena](docs/realistic-models.jpg) | ![HUD panels](docs/premium-pass.jpg) |
+
+A dark-fantasy hot-seat board adventure with real-time 3D duels, for 2-4 knights on one device, in English or Greek. It is a spiritual successor to the 1991 Amiga classic *Moonstone: A Hard Days Knight*, using original names, rules, art and sound. The terrain materials, night sky and nature models are CC0 from Poly Haven; buildings, trees, monsters and the knight are CC-BY models from Sketchfab; icons come from game-icons.net (see [CREDITS.md](CREDITS.md)). All sounds are synthesised in code.
 
 **Play:** <https://nikosandris.github.io/moonstone-successor/>
 
@@ -31,7 +45,11 @@ Full rules: [docs/rules.md](docs/rules.md). The in-game **Menu** (top right) has
 
 ## Run locally
 
+Needs [Node.js](https://nodejs.org/) 20 or newer and Git.
+
 ```bash
+git clone https://github.com/nikosandris/moonstone-successor.git
+cd moonstone-successor
 npm install
 npm run dev        # http://localhost:5173/moonstone-successor/
 npm test           # Vitest unit tests for every rule
