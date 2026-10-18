@@ -103,6 +103,11 @@ export function sharedRenderer(): THREE.WebGLRenderer {
     shared.toneMapping = THREE.ACESFilmicToneMapping;
     shared.outputColorSpace = THREE.SRGBColorSpace;
     shared.domElement.style.touchAction = 'none';
+    (window as unknown as { __gl?: THREE.WebGLRenderer }).__gl = shared; // test hook (memory checks)
+    // the GPU may reclaim the context under memory pressure (common on Android): ask for it back and
+    // let the views rebuild
+    shared.domElement.addEventListener('webglcontextlost', (e) => { e.preventDefault(); for (const f of [...glListeners]) f('lost'); });
+    shared.domElement.addEventListener('webglcontextrestored', () => { for (const f of [...glListeners]) f('restored'); });
   }
   return shared;
 }
@@ -132,4 +137,45 @@ export function capTexture(t: THREE.Texture, max: number, seen = new Set<THREE.T
   (t.image as { close?: () => void }).close?.();
   t.image = c;
   t.needsUpdate = true;
+}
+
+/**
+ * Free everything a view created on the GPU: its effect passes' buffers, and the geometry, materials and
+ * textures of its own objects. Subtrees marked `userData.shared` (models cached for reuse, the fighters)
+ * and textures marked `userData.keep` (module-wide caches) are left alone.
+ */
+export function disposeView(scene: THREE.Scene, composer: EffectComposer | null): void {
+  const shared = new Set<THREE.Object3D>();
+  scene.traverse((o) => { if (o.userData.shared) o.traverse((c) => shared.add(c)); });
+  const geos = new Set<THREE.BufferGeometry>();
+  const mats = new Set<THREE.Material>();
+  // lights own their shadow maps
+  scene.traverse((o) => { if ((o as THREE.Light).isLight && !shared.has(o)) (o as THREE.Light).dispose(); });
+  scene.traverse((o) => {
+    if (shared.has(o) || (o as THREE.InstancedMesh).isInstancedMesh || (o as THREE.SkinnedMesh).isSkinnedMesh) return;
+    const m = o as THREE.Mesh;
+    if (m.geometry) geos.add(m.geometry);
+    if (m.material) for (const mat of Array.isArray(m.material) ? m.material : [m.material]) mats.add(mat);
+  });
+  for (const g of geos) g.dispose();
+  for (const mat of mats) {
+    for (const v of Object.values(mat)) {
+      const t = v as THREE.Texture | null;
+      if (t && t.isTexture && !t.userData.keep) t.dispose();
+    }
+    mat.dispose();
+  }
+  if (composer) {
+    for (const p of composer.passes) (p as { dispose?: () => void }).dispose?.();
+    composer.dispose();
+  }
+}
+
+type GLListener = (state: 'lost' | 'restored') => void;
+const glListeners: GLListener[] = [];
+
+/** Hear about the GPU taking the WebGL context away (and giving it back). */
+export function onContextChange(f: GLListener): () => void {
+  glListeners.push(f);
+  return () => { const i = glListeners.indexOf(f); if (i >= 0) glListeners.splice(i, 1); };
 }

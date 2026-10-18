@@ -15,7 +15,7 @@ import { getMonster } from '../../data/monsters';
 import { getScar } from '../../data/scars';
 import { drawMoon } from '../art/textures';
 import { getLang, t, td, tlog, tn } from '../i18n';
-import { getSettings } from '../settings';
+import { fullscreenAvailable, getSettings, isFullscreen, toggleFullscreen } from '../settings';
 import { SEAL_COLORS, hex } from '../theme';
 import { icon } from './icons';
 
@@ -96,6 +96,7 @@ export class MapHud {
     this.root.append(this.moon, this.tools, this.roster, this.hero, this.chronicle, this.actions, this.tip, this.turnBanner, this.modal, this.tut);
     document.body.appendChild(this.root);
     window.addEventListener('resize', this.onResize);
+    document.addEventListener('fullscreenchange', () => this.renderTools());
     this.heroOpen = window.innerHeight > 520;
     this.layout();
   }
@@ -155,7 +156,9 @@ export class MapHud {
     this.tools.innerHTML = `
       <button class="hx-ibtn hx-help" data-act="help" title="${t('How to play')}">${icon('help')}</button>
       <button class="hx-ibtn ${muted ? 'off' : ''}" data-act="sound" title="${t('Sound')}">${icon(muted ? 'sands-of-time' : 'campfire')}</button>
+      ${fullscreenAvailable() ? `<button class="hx-ibtn" data-act="full" title="${t('Fullscreen')}">${icon(isFullscreen() ? 'contract' : 'expand')}</button>` : ''}
       <button class="hx-ibtn" data-act="menu" title="${t('Menu')}">${icon('scroll-unfurled')}</button>`;
+    this.tools.querySelector('[data-act="full"]')?.addEventListener('click', () => toggleFullscreen());
     this.tools.querySelector('[data-act="menu"]')!.addEventListener('click', () => this.host.onMenu());
     this.tools.querySelector('[data-act="help"]')!.addEventListener('click', () => this.host.onHelp());
     this.tools.querySelector('[data-act="sound"]')!.addEventListener('click', () => this.host.onToggleSound());

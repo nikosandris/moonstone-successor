@@ -194,6 +194,7 @@ const ui: Record<string, string> = {
   "{name}'s Keep": 'Πύργος: {name}',
   'Empty Keep': 'Άδειος Πύργος',
   Graphics: 'Γραφικά',
+  Fullscreen: 'Πλήρης οθόνη',
   Auto: 'Αυτόματα',
   High: 'Υψηλά',
   'Low (faster)': 'Χαμηλά (πιο γρήγορα)',

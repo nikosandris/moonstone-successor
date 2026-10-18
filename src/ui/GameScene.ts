@@ -20,6 +20,7 @@ import { audio } from './audio';
 import { Arena3D } from './arena3d/Arena3D';
 import { is3dReady, preload3d, preloadAllSf, webgl2Available } from './arena3d/assets3d';
 import { loadMapAssets } from './map3d/mapAssets';
+import { onContextChange } from './gfx';
 import { MapWorld3D } from './map3d/MapWorld3D';
 import { getLang, t, td, tlog, tn } from './i18n';
 import { showSettings } from './overlays';
@@ -133,7 +134,15 @@ export class GameScene extends Phaser.Scene {
       Promise.all([core, loadMapAssets((f) => { bar.style.width = `${Math.round(f * 100)}%`; })])
         .then(() => { this.openMap3d(); done(); }, (e) => { console.warn('3D map failed to load, using the 2D map', e); done(); });
     }
-    const cleanup = () => { Arena3D.closeCurrent(); this.map3d?.dispose(); this.map3d = null; };
+    // if the GPU takes the WebGL context away, rebuild the 3D views once it is given back
+    const offGL = onContextChange((st) => {
+      if (st !== 'restored') return;
+      Arena3D.closeCurrent();
+      this.map3d?.dispose();
+      this.map3d = null;
+      this.openMap3d();
+    });
+    const cleanup = () => { offGL(); Arena3D.closeCurrent(); this.map3d?.dispose(); this.map3d = null; };
     this.events.once('shutdown', cleanup);
     this.events.once('destroy', cleanup);
     // keyboard: Space/Enter rolls the die or ends the turn

@@ -76,3 +76,11 @@ One line each: decision - reasoning.
 - Tutorial spotlights on map places follow the camera while it glides into position.
 - Arena stages reuse the map's scanned ground, HDRI and models (pines, bushes, cliffs, the cave mouth, Stonehenge behind the Warden).
 - src/ui/gfx.ts: one AO setup for map and arena (skips glows and helper geometry) and a FrameGovernor that lowers internal resolution, then switches AO off, when frames run long, and climbs back when there is headroom.
+
+## GPU memory management
+- One shared WebGL renderer/canvas for map and arena; Phaser on its 2D canvas when 3D is available.
+- `disposeView` (src/ui/gfx.ts) frees a view's effect-pass buffers (EffectComposer.dispose alone leaves bloom/AO targets), its own geometry, materials and textures, and its lights' shadow maps; cached models and fighters are flagged `userData.shared`, module texture caches `userData.keep`.
+- Fighters free every cloned material and their skeletons' bone textures; PMREM targets and RoomEnvironment scenes are disposed.
+- Verified with renderer.info over six consecutive fights on mobile emulation: memory returns to the same level after each (before: +~20 textures per fight).
+- WebGL context loss (Android under memory pressure) is caught; on restore the board is rebuilt and an open fight reopens.
+- Fullscreen toggle in the HUD and Settings (where the browser supports it).

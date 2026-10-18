@@ -2,7 +2,7 @@
 import { CONFIG } from '../data/balance';
 import SF_CREDITS from '../data/sfCredits.json';
 import { getLang, t, type Lang } from './i18n';
-import { getSettings, updateSettings, type Settings } from './settings';
+import { fullscreenAvailable, getSettings, isFullscreen, toggleFullscreen, updateSettings, type Settings } from './settings';
 
 /** English / Ελληνικά switch (each language names itself). */
 export function langPicker(onPick: () => void): HTMLDivElement {
@@ -118,6 +118,7 @@ export function showSettings(opts: { inGame?: boolean; onQuit?: () => void; onCh
     vol.style.flex = '1';
     row('Volume', vol);
     row('Sound', group([['on', 'On'], ['off', 'Muted']], s.muted ? 'off' : 'on', (v) => updateSettings({ muted: v === 'off' })));
+    if (fullscreenAvailable()) row('Fullscreen', group([['on', 'On'], ['off', 'Off']], isFullscreen() ? 'on' : 'off', (v) => { if ((v === 'on') !== isFullscreen()) toggleFullscreen(); }));
     row('Graphics', group([['auto', 'Auto'], ['high', 'High'], ['low', 'Low (faster)']], s.graphics, (v) => updateSettings({ graphics: v as Settings['graphics'] })));
     row('Reaction time', group([['relaxed', 'Relaxed'], ['normal', 'Normal'], ['expert', 'Expert']], s.reaction, (v) => updateSettings({ reaction: v as Settings['reaction'] })));
     row('Animation', group([['0.75', 'Slow'], ['1', 'Normal'], ['1.5', 'Fast'], ['2', 'Very fast']], String(s.animSpeed), (v) => updateSettings({ animSpeed: Number(v) })));

@@ -82,3 +82,17 @@ export function lowGraphics(): boolean {
   if (current.graphics !== 'auto') return current.graphics === 'low';
   return Math.min(window.innerWidth, window.innerHeight) < 600 || /Android|iPhone|iPad/i.test(navigator.userAgent);
 }
+
+/** Fullscreen (where the browser allows it; iPhones only allow it for video). */
+export function fullscreenAvailable(): boolean {
+  return !!document.documentElement.requestFullscreen;
+}
+
+export function isFullscreen(): boolean {
+  return !!document.fullscreenElement;
+}
+
+export function toggleFullscreen(): void {
+  if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
+  else void document.documentElement.requestFullscreen({ navigationUI: 'hide' }).catch(() => {});
+}

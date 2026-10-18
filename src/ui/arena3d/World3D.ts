@@ -9,7 +9,7 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import type { MoonPhase } from '../../core/types';
 import { drawFog, drawMoon } from '../art/textures';
 import { cloneProp, type PropFile } from './assets3d';
-import { FrameGovernor, makeAO, sharedRenderer } from '../gfx';
+import { FrameGovernor, disposeView, makeAO, sharedRenderer } from '../gfx';
 import { ModelScatter, hasModel, mapEnv, mapTexture, placeModel, type MapModel } from '../map3d/mapAssets';
 import { fbm, splatMaterial } from '../map3d/terrain';
 import { lowGraphics } from '../settings';
@@ -65,6 +65,7 @@ export class World3D {
   readonly camera = new THREE.PerspectiveCamera(38, 16 / 9, 0.1, 200);
   readonly fx = new Fx3D();
   private envMap: THREE.Texture | null = null;
+  private envTarget: THREE.WebGLRenderTarget | null = null;
   private composer: EffectComposer;
   private vignette: ShaderPass;
   private bloom: UnrealBloomPass;
@@ -174,7 +175,10 @@ export class World3D {
     // image-based light so the realistic models' metal and leather read (black otherwise)
     const pmrem = new THREE.PMREMGenerator(this.renderer);
     const hdri = mapEnv();
-    this.envMap = hdri ? pmrem.fromEquirectangular(hdri).texture : pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    const room = hdri ? null : new RoomEnvironment();
+    this.envTarget = hdri ? pmrem.fromEquirectangular(hdri) : pmrem.fromScene(room!, 0.04);
+    this.envMap = this.envTarget.texture;
+    room?.dispose();
     pmrem.dispose();
     s.environment = this.envMap;
     s.environmentIntensity = hdri ? (stage === 'lair' ? 0.45 : 0.75) : stage === 'lair' ? 0.32 : 0.4;
@@ -472,16 +476,9 @@ export class World3D {
   }
 
   dispose(): void {
-    // map models are shared with the board: only free what the arena made itself
-    const shared = new Set<THREE.Object3D>();
-    this.scene.traverse((o) => { if (o.userData.shared) o.traverse((c) => shared.add(c)); });
-    this.scene.traverse((o) => {
-      const m = o as THREE.Mesh;
-      if (m.geometry && !shared.has(o) && !(o as THREE.InstancedMesh).isInstancedMesh && !(o as THREE.SkinnedMesh).isSkinnedMesh) m.geometry.dispose();
-    });
-    this.envMap?.dispose();
-    this.composer.dispose();
-    // the renderer is shared with the map: it stays
+    // map models and the fighters are shared: free only what the arena made itself, passes included
+    this.envTarget?.dispose();
+    disposeView(this.scene, this.composer);
   }
 }
 
@@ -498,5 +495,6 @@ function glowTexture(): THREE.Texture {
   g.fillStyle = grd;
   g.fillRect(0, 0, 64, 64);
   glowTex = new THREE.CanvasTexture(c);
+  glowTex.userData.keep = true;
   return glowTex;
 }

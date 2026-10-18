@@ -20,7 +20,7 @@ import { Actor3D } from '../arena3d/Actor3D';
 import { MONSTER_LOOK } from '../arena3d/Arena3D';
 import { sfReady } from '../arena3d/assets3d';
 import { getLang, t, tn } from '../i18n';
-import { FrameGovernor, makeAO, sharedRenderer } from '../gfx';
+import { FrameGovernor, disposeView, makeAO, sharedRenderer } from '../gfx';
 import { lowGraphics } from '../settings';
 import { SEAL_COLORS } from '../theme';
 import { ModelScatter, hasModel, mapEnv, mapTexture, placeModel, type MapModel } from './mapAssets';
@@ -64,6 +64,7 @@ function glowTexture(): THREE.Texture {
       g.fillRect(0, 0, 64, 64);
     });
   }
+  glowTex.userData.keep = true;
   return glowTex;
 }
 
@@ -159,6 +160,7 @@ export class MapWorld3D {
   private moonSprite: THREE.Sprite | null = null;
   private moonPhase: MoonPhase | null = null;
   private water: Water | null = null;
+  private envTarget: THREE.WebGLRenderTarget | null = null;
   private nature: THREE.Group | null = null;
   private props: THREE.Group | null = null;
   private places: Place[] = [];
@@ -200,7 +202,10 @@ export class MapWorld3D {
 
     const env = mapEnv();
     const pmrem = new THREE.PMREMGenerator(this.renderer);
-    this.scene.environment = env ? pmrem.fromEquirectangular(env).texture : pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    const room = env ? null : new RoomEnvironment();
+    this.envTarget = env ? pmrem.fromEquirectangular(env) : pmrem.fromScene(room!, 0.04);
+    this.scene.environment = this.envTarget.texture;
+    room?.dispose();
     pmrem.dispose();
     this.scene.fog = new THREE.FogExp2(0x18224a, 0.011);
 
@@ -976,7 +981,11 @@ export class MapWorld3D {
     window.removeEventListener('resize', this.onResize);
     for (const pw of this.pawns) pw.actor.dispose();
     for (const pl of this.places) pl.monster?.dispose();
-    this.composer.dispose();
+    this.water?.material.dispose();
+    (this.water as unknown as { material: { uniforms?: { mirrorSampler?: { value: THREE.Texture } } } } | null)?.material.uniforms?.mirrorSampler?.value.dispose();
+    this.envTarget?.dispose();
+    this.skyTex?.dispose();
+    disposeView(this.scene, this.composer);
     // the renderer is shared with the arena and outlives the board
     this.root.remove();
   }

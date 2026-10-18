@@ -131,6 +131,8 @@ export class Actor3D {
   private actions = new Map<string, THREE.AnimationAction>();
   private current: THREE.AnimationAction | null = null;
   private materials: THREE.MeshStandardMaterial[] = [];
+  /** every material this fighter cloned (all freed on dispose; `materials` are the glowing subset) */
+  private owned: THREE.Material[] = [];
   private handR: THREE.Object3D | null = null;
   private chestBone: THREE.Object3D | null = null;
   private glowLight: THREE.PointLight;
@@ -162,6 +164,8 @@ export class Actor3D {
     }
     this.root.add(this.proc);
     this.proc.add(this.model);
+    // the fighter's geometry and props are shared with caches; Actor3D.dispose frees its own materials
+    this.root.userData.shared = true;
     this.mixer = new THREE.AnimationMixer(this.model);
     for (const clip of clips) this.actions.set(clip.name, this.mixer.clipAction(clip));
     if (sf) {
@@ -226,6 +230,7 @@ export class Actor3D {
 
   private adoptMaterial(m: THREE.Material, nodeName: string, look: ActorLook): THREE.Material {
     const c = m.clone() as THREE.MeshStandardMaterial;
+    this.owned.push(c);
     const name = (nodeName + ' ' + (m.name ?? '')).toLowerCase();
     if (!c.color) return c;
     const tintRe = this.tune ? this.tune.tintMat : /(cape|cloak|tabard|badge)/;
@@ -465,6 +470,14 @@ export class Actor3D {
 
   dispose(): void {
     this.mixer.stopAllAction();
-    for (const m of this.materials) m.dispose();
+    this.mixer.uncacheRoot(this.model);
+    // every cloned skeleton keeps its own bone texture on the GPU
+    const skeletons = new Set<THREE.Skeleton>();
+    this.model.traverse((o) => { const sk = (o as THREE.SkinnedMesh).skeleton; if (sk) skeletons.add(sk); });
+    for (const sk of skeletons) sk.dispose();
+    for (const m of this.owned) m.dispose();
+    this.aura.geometry.dispose();
+    (this.aura.material as THREE.Material).dispose();
+    this.glowLight.dispose();
   }
 }
