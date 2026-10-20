@@ -163,7 +163,7 @@ export function buildTerrain(low = false): THREE.Mesh {
   }
   geo.setAttribute('splat', new THREE.BufferAttribute(splat, 4));
 
-  const mat = splatMaterial();
+  const mat = splatMaterial(low);
   const mesh = new THREE.Mesh(geo, mat);
   mesh.receiveShadow = true;
   mesh.castShadow = true;
@@ -174,20 +174,54 @@ export function buildTerrain(low = false): THREE.Mesh {
  * Ground material blending five photo-scanned layers by a per-vertex `splat` attribute
  * (dirt, rock, moss, mud; grass fills the rest). Used by the map and the arena.
  */
-export function splatMaterial(): THREE.MeshStandardMaterial {
+export function splatMaterial(low = false): THREE.MeshStandardMaterial {
+  // The light asset set has no per-layer normal maps: fall back to the flat splat in that case even
+  // when a high-profile material was requested (e.g. an arena built after a low-profile load).
+  const useLow = low || !mapTexture('grass_nor');
   const mat = new THREE.MeshStandardMaterial({ roughness: 0.92, metalness: 0 });
   const tex = (n: string) => ({ value: mapTexture(n) });
+  mat.customProgramCacheKey = () => (useLow ? 'splat-low' : 'splat-high');
   mat.onBeforeCompile = (sh) => {
-    Object.assign(sh.uniforms, {
+    const u: Record<string, { value: THREE.Texture | null }> = {
       tGrass: tex('grass_diff'), tDirt: tex('dirt_diff'), tRock: tex('rock_diff'), tMoss: tex('moss_diff'), tMud: tex('mud_diff'),
-      nGrass: tex('grass_nor'), nDirt: tex('dirt_nor'), nRock: tex('rock_nor'), nMoss: tex('moss_nor'), nMud: tex('mud_nor'),
-    });
+    };
+    if (!useLow) Object.assign(u, { nGrass: tex('grass_nor'), nDirt: tex('dirt_nor'), nRock: tex('rock_nor'), nMoss: tex('moss_nor'), nMud: tex('mud_nor') });
+    Object.assign(sh.uniforms, u);
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', '#include <common>\nattribute vec4 splat;\nvarying vec4 vSplat;\nvarying vec3 vWPos;\nvarying vec3 vWNrm;')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvSplat = splat;\nvWPos = (modelMatrix * vec4(position, 1.0)).xyz;\nvWNrm = normalize(mat3(modelMatrix) * normal);');
+    const commonDecl = useLow
+      ? 'uniform sampler2D tGrass, tDirt, tRock, tMoss, tMud;'
+      : 'uniform sampler2D tGrass, tDirt, tRock, tMoss, tMud, nGrass, nDirt, nRock, nMoss, nMud;';
+    const mapFragment = useLow
+      ? `
+tuv = vWPos.xz * 0.32;
+vec3 cg = texture2D(tGrass, tuv).rgb * vec3(0.92, 1.08, 0.78);
+vec3 cd = texture2D(tDirt, tuv * 0.9).rgb * vec3(1.25, 1.15, 1.0);
+vec3 cr = texture2D(tRock, tuv * 0.5).rgb;
+vec3 cm = texture2D(tMoss, tuv * 0.8).rgb * vec3(0.95, 1.1, 0.85);
+vec3 cu = texture2D(tMud, tuv * 0.8).rgb;
+weights(cg, cd, cr, cm, cu);
+// large-scale tonal variation breaks up any visible tiling
+float macro = texture2D(tMoss, vWPos.xz * 0.013).g;
+diffuseColor.rgb = (cg * wG + cd * wD + cr * wR + cm * wM + cu * wU) * (0.82 + macro * 0.38);
+`
+      : `
+tuv = vWPos.xz * 0.32;
+vec2 tuv2 = vWPos.xz * 0.075 + vec2(0.37, 0.71);
+vec3 cg = mix(texture2D(tGrass, tuv).rgb, texture2D(tGrass, tuv2).rgb, 0.45) * vec3(0.92, 1.08, 0.78);
+vec3 cd = texture2D(tDirt, tuv * 0.9).rgb * vec3(1.25, 1.15, 1.0);
+vec3 cr = mix(texture2D(tRock, tuv * 0.5).rgb, texture2D(tRock, tuv2).rgb, 0.4);
+vec3 cm = texture2D(tMoss, tuv * 0.8).rgb * vec3(0.95, 1.1, 0.85);
+vec3 cu = texture2D(tMud, tuv * 0.8).rgb;
+weights(cg, cd, cr, cm, cu);
+// large-scale tonal variation breaks up any visible tiling
+float macro = texture2D(tMoss, vWPos.xz * 0.013).g;
+diffuseColor.rgb = (cg * wG + cd * wD + cr * wR + cm * wM + cu * wU) * (0.82 + macro * 0.38);
+`;
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', `#include <common>
-uniform sampler2D tGrass, tDirt, tRock, tMoss, tMud, nGrass, nDirt, nRock, nMoss, nMud;
+${commonDecl}
 varying vec4 vSplat;
 varying vec3 vWPos;
 varying vec3 vWNrm;
@@ -206,21 +240,10 @@ void weights(vec3 cg, vec3 cd, vec3 cr, vec3 cm, vec3 cu) {
   wG /= sum; wD /= sum; wR /= sum; wM /= sum; wU /= sum;
 }
 `)
-      .replace('#include <map_fragment>', `
-tuv = vWPos.xz * 0.32;
-vec2 tuv2 = vWPos.xz * 0.075 + vec2(0.37, 0.71);
-vec3 cg = mix(texture2D(tGrass, tuv).rgb, texture2D(tGrass, tuv2).rgb, 0.45) * vec3(0.92, 1.08, 0.78);
-vec3 cd = texture2D(tDirt, tuv * 0.9).rgb * vec3(1.25, 1.15, 1.0);
-vec3 cr = mix(texture2D(tRock, tuv * 0.5).rgb, texture2D(tRock, tuv2).rgb, 0.4);
-vec3 cm = texture2D(tMoss, tuv * 0.8).rgb * vec3(0.95, 1.1, 0.85);
-vec3 cu = texture2D(tMud, tuv * 0.8).rgb;
-weights(cg, cd, cr, cm, cu);
-// large-scale tonal variation breaks up any visible tiling
-float macro = texture2D(tMoss, vWPos.xz * 0.013).g;
-diffuseColor.rgb = (cg * wG + cd * wD + cr * wR + cm * wM + cu * wU) * (0.82 + macro * 0.38);
-`)
-      .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = 0.95 * wG + 0.9 * wD + 0.8 * wR + 0.95 * wM + 0.45 * wU;')
-      .replace('#include <normal_fragment_maps>', `
+      .replace('#include <map_fragment>', mapFragment)
+      .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = 0.95 * wG + 0.9 * wD + 0.8 * wR + 0.95 * wM + 0.45 * wU;');
+    if (!useLow) {
+      sh.fragmentShader = sh.fragmentShader.replace('#include <normal_fragment_maps>', `
 {
   vec3 ng = texture2D(nGrass, tuv).xyz * 2.0 - 1.0;
   vec3 nd = texture2D(nDirt, tuv * 0.9).xyz * 2.0 - 1.0;
@@ -235,6 +258,7 @@ diffuseColor.rgb = (cg * wG + cd * wD + cr * wR + cm * wM + cu * wU) * (0.82 + m
   normal = normalize((viewMatrix * vec4(wn, 0.0)).xyz);
 }
 `);
+    }
   };
   return mat;
 }

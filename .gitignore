@@ -147,3 +147,6 @@ vite.config.ts.timestamp-*
 
 # Turbo Repo
 .turbo
+
+# Hermes agent scratch space (hermes-run TMPDIR)
+.scratch/

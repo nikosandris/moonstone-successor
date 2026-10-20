@@ -145,3 +145,24 @@
 - Only the troll, golem, spider and serpent ship real attack clips; the knight, dark knight, wolf, drake and lich strike with procedural body motion plus their idle.
 - The Road Bandit still uses the stylised model (no good realistic match found).
 - About 8.5 MB extra download (background, after the game is playable).
+
+## P1 - Phones run smoothly (done)
+
+**Measured first** (phone emulation: 844x390 landscape, DPR 3, Android UA, real GPU, CPU throttled 4x; scripts kept outside the repo):
+- The map sent 11,353 draw calls per frame (2,355 of them for shadows): `house1.glb` was 266 separate meshes and phones placed it 8 times (it also stood in for the mill).
+- `webgl2Available()` created a new WebGL2 context on every UI render; after ~16 Chrome killed the oldest one - the game's own renderer - so fights went blank and the board was rebuilt. This was the main freeze on phones.
+- Every map actor carried an unused point light (9 extra lights in every lit pixel); phones also paid for bloom, a mirror sea, tilt-shift blur, ground normal maps and 13 place lights.
+
+**Changed**
+- Static map models merged per material (`scripts/optimize-map-models.ts`): house1 266 -> 2 draws, spruce 86 -> 8, fort 45 -> 5; no visual change.
+- WebGL2 support is probed once and the probe context released.
+- Phone profile (`lowGraphics()`): map without place point lights, mirror water (plain animated sea), bloom, blur and ground normal maps; arena without bloom, torch/altar/ember lights and fighter glow lights, 512 shadow map, one fog layer; both capped at 30 fps, max pixel ratio 1.25. The frame governor now takes a target fps (30 on phones) instead of treating every capped frame as slow. Map actors never get a glow light. Phaser's camera is hidden while the 3D board is shown.
+- Phone asset set `public/assets/low` (`scripts/make-low-assets.ts`): 512 px textures, scanned rocks/cliffs simplified to 25%, no terrain normal maps or HDR; phones load it instead of shrinking textures at runtime (about 13.5 MB instead of 23.9 MB of map/fighter assets).
+
+**Verification**
+- `npm test`: 121 pass. `npm run build`: 0 errors.
+- Phone emulation, before -> after: map draw calls 11,353 -> 512 per frame; map frames over 50 ms in 12 s 29 -> 2, p95 frame 117 ms -> 17 ms; fight before: blank (context lost), after: steady 29 fps (capped 30), p95 17 ms; load 8.9 s -> 5.3 s; JS heap 88 -> 70 MB; GPU geometries 593 -> 201.
+- Desktop profile acceptance checks pass: place point lights kept, mirror water, bloom, terrain normal maps, HDR, no requests to the phone asset set.
+
+**Known issues**
+- Not yet measured on a real phone.

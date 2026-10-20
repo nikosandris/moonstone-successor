@@ -4,7 +4,6 @@ import * as THREE from 'three';
 import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js';
 import { HDRLoader } from 'three/addons/loaders/HDRLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
-import { capTexture, capTextures } from '../gfx';
 import { lowGraphics } from '../settings';
 
 const BASE = import.meta.env.BASE_URL;
@@ -24,8 +23,7 @@ let loading: Promise<void> | null = null;
  * Make downloaded models behave in a lit night scene: unlit materials become lit, and blended foliage
  * becomes alpha-tested (blending breaks with instancing and depth sorting).
  */
-function prepare(scene: THREE.Object3D): THREE.Object3D {
-  if (lowGraphics()) capTextures(scene, 512);
+function prepare(scene: THREE.Object3D, _low: boolean): THREE.Object3D {
   scene.traverse((o) => {
     const mesh = o as THREE.Mesh;
     if (!mesh.isMesh) return;
@@ -53,33 +51,39 @@ function prepare(scene: THREE.Object3D): THREE.Object3D {
 /** Load everything the map needs; `onProgress` gets 0..1. */
 export function loadMapAssets(onProgress?: (f: number) => void): Promise<void> {
   if (loading) return loading;
+  const low = lowGraphics();
+  // Phones load the pre-built light set (scripts/make-low-assets.ts): 512 px textures, no normal
+  // maps, no HDR. High profiles load exactly what they always did.
+  const ph = `${BASE}assets/${low ? 'low/' : ''}ph/`;
+  const sf = `${BASE}assets/${low ? 'low/' : ''}sf/`;
   const gl = new GLTFLoader();
   gl.setMeshoptDecoder(MeshoptDecoder);
   const tl = new THREE.TextureLoader();
   const jobs: (() => Promise<void>)[] = [];
   for (const layer of TERRAIN_LAYERS) {
     for (const kind of ['diff', 'nor'] as const) {
-      jobs.push(() => tl.loadAsync(`${BASE}assets/ph/${layer}_${kind}.webp`).then((t) => {
+      // the light set has no per-layer normal maps: don't even create those jobs
+      if (low && kind === 'nor') continue;
+      jobs.push(() => tl.loadAsync(`${ph}${layer}_${kind}.webp`).then((t) => {
         t.wrapS = t.wrapT = THREE.RepeatWrapping;
         t.anisotropy = 8;
         if (kind === 'diff') t.colorSpace = THREE.SRGBColorSpace;
-        if (lowGraphics()) capTexture(t, 512);
         textures.set(`${layer}_${kind}`, t);
       }));
     }
   }
-  jobs.push(() => tl.loadAsync(`${BASE}assets/ph/waternormals.webp`).then((t) => {
+  jobs.push(() => tl.loadAsync(`${ph}waternormals.webp`).then((t) => {
     t.wrapS = t.wrapT = THREE.RepeatWrapping;
     textures.set('water', t);
   }));
   // a floating-point sky is the heaviest single texture: phones light with a synthetic environment instead
-  if (!lowGraphics()) jobs.push(() => new HDRLoader().loadAsync(`${BASE}assets/ph/night.hdr`).then((t) => {
+  if (!low) jobs.push(() => new HDRLoader().loadAsync(`${BASE}assets/ph/night.hdr`).then((t) => {
     t.mapping = THREE.EquirectangularReflectionMapping;
     env = t;
   }));
-  const glb = (url: string, name: string) => () => gl.loadAsync(url).then((g: GLTF) => { models.set(name, prepare(g.scene)); });
-  for (const m of PH_MODELS) jobs.push(glb(`${BASE}assets/ph/${m}.glb`, m));
-  for (const m of SF_MODELS) if (!(lowGraphics() && m === 'mill')) jobs.push(glb(`${BASE}assets/sf/${m}.glb`, m));
+  const glb = (url: string, name: string) => () => gl.loadAsync(url).then((g: GLTF) => { models.set(name, prepare(g.scene, low)); });
+  for (const m of PH_MODELS) jobs.push(glb(`${ph}${m}.glb`, m));
+  for (const m of SF_MODELS) if (!(low && m === 'mill')) jobs.push(glb(`${sf}${m}.glb`, m));
   let done = 0;
   loading = (async () => {
     // a few at a time: fast on good connections without starving the rest of the page

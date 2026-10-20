@@ -37,7 +37,7 @@ export class FrameGovernor {
   private fastFor = 0;
   private optional: { pass: { enabled: boolean }; on: boolean }[] = [];
 
-  constructor(private renderer: THREE.WebGLRenderer, private composer: EffectComposer | null, maxRatio: number, private onResize: () => void) {
+  constructor(private renderer: THREE.WebGLRenderer, private composer: EffectComposer | null, maxRatio: number, private onResize: () => void, private targetFps = 60) {
     const cap = Math.min(window.devicePixelRatio || 1, maxRatio);
     this.maxLevel = RATIOS.reduce((best, r, i) => (r <= cap + 0.01 ? i : best), 0);
     this.level = this.maxLevel;
@@ -62,7 +62,7 @@ export class FrameGovernor {
     const avg = this.acc / this.frames;
     this.acc = 0;
     this.frames = 0;
-    if (avg > 1 / 42) { this.slowFor += 0.5; this.fastFor = 0; } else if (avg < 1 / 57) { this.fastFor += 0.5; this.slowFor = 0; } else { this.slowFor = 0; this.fastFor = 0; }
+    if (avg > 1 / (this.targetFps * 0.7)) { this.slowFor += 0.5; this.fastFor = 0; } else if (avg < 1 / (this.targetFps * 0.95)) { this.fastFor += 0.5; this.slowFor = 0; } else { this.slowFor = 0; this.fastFor = 0; }
     if (this.slowFor >= 1.5) {
       this.slowFor = 0;
       const off = this.optional.find((o) => o.pass.enabled);

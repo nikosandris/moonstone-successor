@@ -11,7 +11,7 @@ import { getItem } from '../../data/items';
 import { getMonster } from '../../data/monsters';
 import { audio } from '../audio';
 import { t, td, tlog, tn } from '../i18n';
-import { getSettings, reactionScale } from '../settings';
+import { getSettings, lowGraphics, reactionScale } from '../settings';
 import { hex } from '../theme';
 import { icon } from '../hud/icons';
 import { sharedRenderer } from '../gfx';
@@ -159,6 +159,8 @@ export class Arena3D {
   private onKey = (e: KeyboardEvent) => this.key(e);
   private onResize = () => this.layout();
   private speed: number;
+  private low = lowGraphics();
+  private lastFrame = 0;
 
   private constructor(private host: Arena3DHost) {
     if (!document.getElementById('a3d-css')) {
@@ -182,11 +184,11 @@ export class Arena3D {
     this.world.fx.bloodOn = getSettings().blood;
 
     const ka = s.players[c.a];
-    this.a = new Actor3D({ model: 'knight', sf: 'knight', tint: ka.color });
-    if (c.monsterId) this.b = new Actor3D(MONSTER_LOOK[c.monsterId] ?? MONSTER_LOOK.rustKnight);
+    this.a = new Actor3D({ model: 'knight', sf: 'knight', tint: ka.color }, { glowLight: !lowGraphics() });
+    if (c.monsterId) this.b = new Actor3D(MONSTER_LOOK[c.monsterId] ?? MONSTER_LOOK.rustKnight, { glowLight: !lowGraphics() });
     else {
       const kb = s.players[c.b!];
-      this.b = new Actor3D({ model: 'knight', sf: 'knight', tint: kb.color });
+      this.b = new Actor3D({ model: 'knight', sf: 'knight', tint: kb.color }, { glowLight: !lowGraphics() });
     }
     // big creatures stand further back so bodies never interpenetrate
     // (the front of each body keeps its old mark; long tails and wings extend backwards)
@@ -245,6 +247,11 @@ export class Arena3D {
   private loop = (): void => {
     if (this.phase === 'closed') return;
     const t = performance.now();
+    if (this.low && t - this.lastFrame < (1 / 30 - 0.002) * 1000) {
+      this.raf = requestAnimationFrame(this.loop);
+      return;
+    }
+    this.lastFrame = t;
     const realDt = Math.min(0.05, (t - this.clock) / 1000);
     this.clock = t;
     const dt = realDt * this.speed * this.timeScale;

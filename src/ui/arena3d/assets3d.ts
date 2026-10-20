@@ -4,11 +4,12 @@ import * as THREE from 'three';
 import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
-import { capTextures } from '../gfx';
 import { lowGraphics } from '../settings';
 
 const BASE = `${import.meta.env.BASE_URL}assets/3d/`;
 const SF_BASE = `${import.meta.env.BASE_URL}assets/sf/`;
+// Pre-built phone set (scripts/make-low-assets.ts): 512 px textures, meshopt geometry.
+const SF_LOW_BASE = `${import.meta.env.BASE_URL}assets/low/sf/`;
 
 /** Realistic models, keyed by the monster id they replace ('knight' is the player). */
 export const SF_FILES = ['knight', 'direWolf', 'bogTroll', 'rustKnight', 'caveDrake', 'giantSpider', 'marshSerpent', 'boneGolem', 'guardian'] as const;
@@ -43,10 +44,11 @@ const sfLoading = new Map<string, Promise<GLTF | null>>();
 
 /** Load one realistic model in the background (about 0.3-2 MB each); resolves null on failure. */
 export function preloadSf(name: SfFile | SfProp): Promise<GLTF | null> {
+  const low = lowGraphics();
   let p = sfLoading.get(name);
   if (!p) {
-    p = load(name, SF_BASE).then((g) => {
-      if (lowGraphics()) capTextures(g.scene, 512);
+    // phones load the pre-built light set; it is already 512 px, so no runtime capping
+    p = load(name, low ? SF_LOW_BASE : SF_BASE).then((g) => {
       sfCache.set(name, g);
       return g;
     }, () => { sfLoading.delete(name); return null; });
@@ -121,11 +123,18 @@ export function getClips(): THREE.AnimationClip[] {
   return clips;
 }
 
+let webgl2: boolean | null = null;
+
+/** Whether the browser can create a WebGL2 context. Probed once; the probe context is released at once. */
 export function webgl2Available(): boolean {
+  if (webgl2 !== null) return webgl2;
   try {
     const c = document.createElement('canvas');
-    return !!c.getContext('webgl2');
+    const gl = c.getContext('webgl2');
+    webgl2 = !!gl;
+    gl?.getExtension('WEBGL_lose_context')?.loseContext();
   } catch {
-    return false;
+    webgl2 = false;
   }
+  return webgl2;
 }

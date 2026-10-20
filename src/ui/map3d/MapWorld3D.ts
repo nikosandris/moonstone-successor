@@ -160,6 +160,7 @@ export class MapWorld3D {
   private moonSprite: THREE.Sprite | null = null;
   private moonPhase: MoonPhase | null = null;
   private water: Water | null = null;
+  private seaLow: THREE.Mesh | null = null;
   private envTarget: THREE.WebGLRenderTarget | null = null;
   private nature: THREE.Group | null = null;
   private props: THREE.Group | null = null;
@@ -168,12 +169,13 @@ export class MapWorld3D {
   private pathDots: THREE.Sprite[] = [];
   private sanctumBeam!: THREE.Mesh;
   private sanctumGlow!: THREE.Sprite;
-  private sanctumLight!: THREE.PointLight;
+  private sanctumLight!: THREE.PointLight | null;
   private fireflies!: THREE.Points;
   private flames: { s: THREE.Sprite; base: number; seed: number }[] = [];
   private banners: THREE.Mesh[] = [];
   private clock = new THREE.Clock();
   private raf = 0;
+  private lastDraw = 0;
   private paused = false;
   private view: MapView | null = null;
   private hover: number | null = null;
@@ -214,8 +216,8 @@ export class MapWorld3D {
     if (!this.mobile) {
       this.gtao = makeAO(this.scene, this.camera);
       this.composer.addPass(this.gtao);
+      this.composer.addPass(new UnrealBloomPass(new THREE.Vector2(512, 512), 0.5, 0.55, 0.85));
     }
-    this.composer.addPass(new UnrealBloomPass(new THREE.Vector2(512, 512), 0.5, 0.55, 0.85));
     this.composer.addPass(new OutputPass());
     this.final = new ShaderPass(FinalShader);
     this.composer.addPass(this.final);
@@ -236,8 +238,20 @@ export class MapWorld3D {
     window.addEventListener('resize', this.onResize);
     document.body.appendChild(this.root);
     (window as unknown as { __map3d?: MapWorld3D }).__map3d = this; // test hook
-    (window as unknown as { __map3dInfo?: () => unknown }).__map3dInfo = () => ({ ...this.renderer.info.render, ratio: this.governor.pixelRatio });
-    this.governor = new FrameGovernor(this.renderer, this.composer, this.mobile ? 1.5 : 2, () => this.resize());
+    (window as unknown as { __map3dInfo?: () => unknown }).__map3dInfo = () => {
+      let pointLights = 0;
+      this.scene.traverse((o) => { if (o instanceof THREE.PointLight) pointLights++; });
+      return {
+        ...this.renderer.info.render,
+        ratio: this.governor.pixelRatio,
+        low: this.mobile,
+        pointLights,
+        mirrorWater: !!this.water,
+        bloom: this.composer.passes.some((p) => p instanceof UnrealBloomPass),
+        frames: this.renderer.info.render.frame,
+      };
+    };
+    this.governor = new FrameGovernor(this.renderer, this.composer, this.mobile ? 1.25 : 2, () => this.resize(), this.mobile ? 30 : 60);
     if (this.gtao) this.governor.addOptional(this.gtao);
     this.resize();
     this.loop();
@@ -267,6 +281,17 @@ export class MapWorld3D {
   private buildSea(): void {
     const normals = mapTexture('water');
     if (!normals) return;
+    if (this.mobile) {
+      const n = normals.clone();
+      n.wrapS = n.wrapT = THREE.RepeatWrapping;
+      n.repeat.set(60, 60);
+      const mat = new THREE.MeshStandardMaterial({ color: 0x03182a, roughness: 0.3, metalness: 0.1, normalMap: n, normalScale: new THREE.Vector2(0.5, 0.5) });
+      this.seaLow = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), mat);
+      this.seaLow.rotation.x = -Math.PI / 2;
+      this.seaLow.position.y = WATER_Y;
+      this.scene.add(this.seaLow);
+      return;
+    }
     this.water = new Water(new THREE.PlaneGeometry(400, 400), {
       textureWidth: this.mobile ? 256 : 512, textureHeight: this.mobile ? 256 : 512, waterNormals: normals,
       sunDirection: new THREE.Vector3(-0.5, 0.7, -0.5).normalize(), sunColor: 0xc8d6ff, waterColor: 0x02121f, distortionScale: 2.2, fog: true,
@@ -411,9 +436,11 @@ export class MapWorld3D {
         const b = at(-2.2, 1.3);
         props.add('barrel', b.x, this.ground(b.x, b.z), b.z, 0.32);
         props.add('crate', b.x + 0.3, this.ground(b.x + 0.3, b.z), b.z + 0.1, 0.28, 0.5);
-        p.light = new THREE.PointLight(0xffa868, 5, 6, 1.6);
-        p.light.position.set(x, p.pos.y + 1.4, z);
-        this.scene.add(p.light);
+        if (!this.mobile) {
+          p.light = new THREE.PointLight(0xffa868, 5, 6, 1.6);
+          p.light.position.set(x, p.pos.y + 1.4, z);
+          this.scene.add(p.light);
+        }
         break;
       }
       case 'village': {
@@ -432,9 +459,11 @@ export class MapWorld3D {
         const l = at(0.6, 1.0);
         props.add('lantern', l.x, this.ground(l.x, l.z), l.z, 0.45, face);
         this.flame(l.x, this.ground(l.x, l.z) + 0.38, l.z);
-        p.light = new THREE.PointLight(0xff9a50, 7, 7, 1.5);
-        p.light.position.set(x, p.pos.y + 1.2, z);
-        this.scene.add(p.light);
+        if (!this.mobile) {
+          p.light = new THREE.PointLight(0xff9a50, 7, 7, 1.5);
+          p.light.position.set(x, p.pos.y + 1.2, z);
+          this.scene.add(p.light);
+        }
         p.glow = glowSprite(0xffa050, 3.4, 0.22);
         p.glow.position.set(x, p.pos.y + 0.8, z);
         this.scene.add(p.glow);
@@ -453,9 +482,11 @@ export class MapWorld3D {
         p.glow = glowSprite(0xff3a1c, 2.6, 0.45);
         p.glow.position.set(g.x, p.pos.y + 0.9, g.z);
         this.scene.add(p.glow);
-        p.light = new THREE.PointLight(0xff4a2a, 6, 5, 1.6);
-        p.light.position.set(g.x, p.pos.y + 1.0, g.z);
-        this.scene.add(p.light);
+        if (!this.mobile) {
+          p.light = new THREE.PointLight(0xff4a2a, 6, 5, 1.6);
+          p.light.position.set(g.x, p.pos.y + 1.0, g.z);
+          this.scene.add(p.light);
+        }
         const gem = new THREE.Mesh(new THREE.OctahedronGeometry(0.3), new THREE.MeshStandardMaterial({ color: SEAL_COLORS[n.seal!], emissive: SEAL_COLORS[n.seal!], emissiveIntensity: 1.6, roughness: 0.15, metalness: 0.4 }));
         gem.position.set(x, p.pos.y + 3.3, z);
         gem.castShadow = true;
@@ -490,9 +521,13 @@ export class MapWorld3D {
         this.sanctumBeam.position.set(x, p.pos.y + 9.2, z);
         this.sanctumGlow = glowSprite(0x9fb4ff, 6, 0.35);
         this.sanctumGlow.position.set(x, p.pos.y + 1, z);
-        this.sanctumLight = new THREE.PointLight(0x9fb4ff, 8, 10, 1.6);
-        this.sanctumLight.position.set(x, p.pos.y + 1.8, z);
-        this.scene.add(this.sanctumBeam, this.sanctumGlow, this.sanctumLight);
+        this.sanctumLight = this.mobile ? null : new THREE.PointLight(0x9fb4ff, 8, 10, 1.6);
+        if (this.sanctumLight) {
+          this.sanctumLight.position.set(x, p.pos.y + 1.8, z);
+          this.scene.add(this.sanctumBeam, this.sanctumGlow, this.sanctumLight);
+        } else {
+          this.scene.add(this.sanctumBeam, this.sanctumGlow);
+        }
         break;
       }
       case 'road': {
@@ -613,8 +648,10 @@ export class MapWorld3D {
     (this.sanctumBeam.material as THREE.ShaderMaterial).uniforms.strength.value = open ? 1 : 0;
     this.sanctumGlow.material.color.setHex(open ? 0xffd060 : 0x9fb4ff);
     this.sanctumGlow.scale.setScalar(open ? 9 : 5);
-    this.sanctumLight.color.setHex(open ? 0xffd27a : 0x9fb4ff);
-    this.sanctumLight.intensity = open ? 18 : 7;
+    if (this.sanctumLight) {
+      this.sanctumLight.color.setHex(open ? 0xffd27a : 0x9fb4ff);
+      this.sanctumLight.intensity = open ? 18 : 7;
+    }
   }
 
   private homesBuilt = '';
@@ -663,7 +700,7 @@ export class MapWorld3D {
       if (pl.monster && pl.monster.realistic === want) continue;
       if (pl.monster) { this.scene.remove(pl.monster.root); pl.monster.dispose(); }
       try {
-        const a = new Actor3D(look);
+        const a = new Actor3D(look, { glowLight: false });
         const s = Math.min(1.5 / a.height, 2.2 / (a.reach * 2));
         a.root.scale.setScalar(s * (pl.node.type === 'sanctum' ? 1.15 : 1));
         const face = Math.atan2(-pl.pos.x, -pl.pos.z);
@@ -701,7 +738,7 @@ export class MapWorld3D {
       }
       if (!pawn) {
         let actor: Actor3D;
-        try { actor = new Actor3D({ model: 'knight', sf: 'knight', tint: p.color }); } catch { continue; }
+        try { actor = new Actor3D({ model: 'knight', sf: 'knight', tint: p.color }, { glowLight: false }); } catch { continue; }
         actor.root.scale.setScalar(1.05 / actor.height);
         const base = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.33, 0.06, 32), new THREE.MeshStandardMaterial({ color: p.color, emissive: p.color, emissiveIntensity: 0.5, roughness: 0.35, metalness: 0.6 }));
         base.castShadow = true;
@@ -884,6 +921,11 @@ export class MapWorld3D {
   private loop = () => {
     this.raf = requestAnimationFrame(this.loop);
     if (this.paused) return;
+    if (this.mobile) {
+      const now = performance.now();
+      if (now - this.lastDraw < (1 / 30 - 0.002) * 1000) return;
+      this.lastDraw = now;
+    }
     const raw = this.clock.getDelta();
     this.governor.tick(raw);
     const dt = Math.min(0.05, raw);
@@ -898,9 +940,14 @@ export class MapWorld3D {
     this.camera.lookAt(this.target.x, gy, this.target.z);
     this.key.target.position.set(this.target.x * 0.3, 0, this.target.z * 0.3);
     // the focus band follows the zoom: close up, a stronger miniature effect
-    this.final.uniforms.blur.value = THREE.MathUtils.clamp(1.6 - this.dist / 30, 0.25, 1.2);
+    this.final.uniforms.blur.value = this.mobile ? 0 : THREE.MathUtils.clamp(1.6 - this.dist / 30, 0.25, 1.2);
     this.final.uniforms.time.value = t % 100;
     if (this.water) (this.water.material as THREE.ShaderMaterial).uniforms.time.value = t * 0.35;
+    if (this.seaLow) {
+      const nm = (this.seaLow.material as THREE.MeshStandardMaterial).normalMap!;
+      nm.offset.x = t * 0.004;
+      nm.offset.y = t * 0.0025;
+    }
     const fp = this.fireflies.geometry.getAttribute('position') as THREE.BufferAttribute;
     for (let i = 0; i < fp.count; i++) fp.setY(i, 0.5 + hash(i, 12) * 1.6 + Math.sin(t * 0.8 + i) * 0.15);
     fp.needsUpdate = true;
@@ -983,6 +1030,12 @@ export class MapWorld3D {
     for (const pl of this.places) pl.monster?.dispose();
     this.water?.material.dispose();
     (this.water as unknown as { material: { uniforms?: { mirrorSampler?: { value: THREE.Texture } } } } | null)?.material.uniforms?.mirrorSampler?.value.dispose();
+    if (this.seaLow) {
+      const m = this.seaLow.material as THREE.MeshStandardMaterial;
+      m.normalMap?.dispose();
+      m.dispose();
+      this.seaLow.geometry.dispose();
+    }
     this.envTarget?.dispose();
     this.skyTex?.dispose();
     disposeView(this.scene, this.composer);

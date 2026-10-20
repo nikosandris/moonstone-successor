@@ -330,6 +330,7 @@ export class GameScene extends Phaser.Scene {
       // every fight covers the board; the Phaser canvas is only needed for the 2D and classic fights
       this.map3d.setPaused(s.stage === 'combat');
       this.game.canvas.style.visibility = s.stage === 'combat' && this.realtimeMode() !== 'arena3d' ? 'visible' : 'hidden';
+      this.cameras.main.setVisible(this.game.canvas.style.visibility === 'visible');
     } else {
       this.drawNodes();
     }

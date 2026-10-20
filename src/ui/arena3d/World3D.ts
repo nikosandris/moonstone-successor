@@ -68,8 +68,10 @@ export class World3D {
   private envTarget: THREE.WebGLRenderTarget | null = null;
   private composer: EffectComposer;
   private vignette: ShaderPass;
-  private bloom: UnrealBloomPass;
-  private flickers: { light: THREE.PointLight; base: number; seed: number; flame: THREE.Sprite }[] = [];
+  private bloom: UnrealBloomPass | null;
+  private low: boolean;
+  private keyShadowSize = 1024;
+  private flickers: { light: THREE.PointLight | null; base: number; seed: number; flame: THREE.Sprite }[] = [];
   private fogPlanes: THREE.Mesh[] = [];
   private time = 0;
   private shake = 0;
@@ -86,21 +88,26 @@ export class World3D {
     void canvas;
     this.renderer.toneMappingExposure = phase === 'full' ? 1.15 : phase === 'new' ? 0.85 : 1.0;
 
+    this.low = lowGraphics();
     this.buildStage(stage, phase, seed);
     this.scene.add(this.fx.group);
 
     this.composer = new EffectComposer(this.renderer);
     this.composer.addPass(new RenderPass(this.scene, this.camera));
-    const low = lowGraphics();
-    const ao = !low && this.realistic ? makeAO(this.scene, this.camera, 0.5) : null;
+    const ao = !this.low && this.realistic ? makeAO(this.scene, this.camera, 0.5) : null;
     if (ao) this.composer.addPass(ao);
-    this.bloom = new UnrealBloomPass(new THREE.Vector2(512, 288), 0.55, 0.6, 0.78);
-    this.composer.addPass(this.bloom);
+    this.bloom = this.low ? null : new UnrealBloomPass(new THREE.Vector2(512, 288), 0.55, 0.6, 0.78);
+    if (this.bloom) this.composer.addPass(this.bloom);
     this.vignette = new ShaderPass(VignetteShader);
     this.composer.addPass(this.vignette);
     this.composer.addPass(new OutputPass());
-    this.governor = new FrameGovernor(this.renderer, this.composer, low ? 1.5 : 2, () => this.resize(this.size.x, this.size.y));
+    this.governor = new FrameGovernor(this.renderer, this.composer, this.low ? 1.25 : 2, () => this.resize(this.size.x, this.size.y), this.low ? 30 : 60);
     if (ao) this.governor.addOptional(ao);
+    (window as unknown as { __arena3dInfo?: () => unknown }).__arena3dInfo = () => {
+      let pointLights = 0;
+      this.scene.traverse((o) => { if ((o as THREE.PointLight).isPointLight) pointLights++; });
+      return { low: this.low, pointLights, bloom: !!this.bloom, ratio: this.renderer.getPixelRatio(), shadow: this.keyShadowSize, fogPlanes: this.fogPlanes.length, frames: this.renderer.info.render.frame };
+    };
   }
 
   private governor: FrameGovernor;
@@ -163,7 +170,8 @@ export class World3D {
     const key = new THREE.DirectionalLight(stage === 'lair' ? 0xffc0a0 : 0xa8bcff, moonStrength * (stage === 'lair' ? 0.9 : 1.2));
     key.position.set(6, 12, 4);
     key.castShadow = true;
-    key.shadow.mapSize.set(1024, 1024);
+    this.keyShadowSize = this.low ? 512 : 1024;
+    key.shadow.mapSize.set(this.keyShadowSize, this.keyShadowSize);
     key.shadow.camera.left = -6;
     key.shadow.camera.right = 6;
     key.shadow.camera.top = 6;
@@ -289,13 +297,15 @@ export class World3D {
       flame.position.set(x, 1.75, z);
       flame.scale.set(0.5, 0.8, 1);
       s.add(flame);
-      const light = new THREE.PointLight(0xff8a3a, 6, 9, 1.8);
-      light.position.set(x, 1.9, z);
-      s.add(light);
+      const light = this.low ? null : new THREE.PointLight(0xff8a3a, 6, 9, 1.8);
+      if (light) {
+        light.position.set(x, 1.9, z);
+        s.add(light);
+      }
       this.flickers.push({ light, base: 6, seed: x * 3 + z, flame });
       this.fx.addEmberSource(new THREE.Vector3(x, 1.8, z));
     }
-    if (stage === 'sanctum') {
+    if (stage === 'sanctum' && !this.low) {
       const altar = new THREE.PointLight(phase === 'full' ? 0xffd27a : 0x8fa8ff, 5, 12, 1.5);
       altar.position.set(0, 2.5, -3);
       s.add(altar);
@@ -304,7 +314,7 @@ export class World3D {
     // drifting ground fog
     const fogTex = new THREE.CanvasTexture(drawFog());
     fogTex.wrapS = fogTex.wrapT = THREE.RepeatWrapping;
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < (this.low ? 1 : 3); i++) {
       const f = new THREE.Mesh(
         new THREE.PlaneGeometry(40, 40),
         new THREE.MeshBasicMaterial({ map: fogTex.clone(), transparent: true, opacity: 0.16 - i * 0.03, depthWrite: false, color: 0xaab4d8 }),
@@ -356,7 +366,7 @@ export class World3D {
       splat.set([Math.min(1, dirt), rock, moss * (1 - dirt), mud], i * 4);
     }
     geo.setAttribute('splat', new THREE.BufferAttribute(splat, 4));
-    const ground = new THREE.Mesh(geo, splatMaterial());
+    const ground = new THREE.Mesh(geo, splatMaterial(lowGraphics()));
     ground.receiveShadow = true;
     s.add(ground);
 
@@ -406,9 +416,11 @@ export class World3D {
       put('lairgate', 5.2, 2.6, -6.2, -0.35, 'height', 0.3);
       put('deadtree', 3.2, -4.8, -4.2, 0.8);
       for (const [x, z] of [[-6, -1], [6.5, -0.5], [-3, -6]] as [number, number][]) props.add('rocks_b', x, height(x, z) - 0.1, z, 2.2, rnd() * 6, 'width');
-      const ember = new THREE.PointLight(0xff4a2a, 9, 9, 1.6);
-      ember.position.set(2.6, 1.6, -5.4);
-      s.add(ember);
+      if (!low) {
+        const ember = new THREE.PointLight(0xff4a2a, 9, 9, 1.6);
+        ember.position.set(2.6, 1.6, -5.4);
+        s.add(ember);
+      }
     }
     if (stage === 'sanctum') put('stonehenge', 15, 0, -10.5, 0.4, 'width', 0.2);
     if (stage === 'forest') {
@@ -447,7 +459,7 @@ export class World3D {
     this.fx.update(dt);
     for (const f of this.flickers) {
       const v = 0.8 + 0.2 * Math.sin(this.time * 17 + f.seed) * Math.sin(this.time * 7.3 + f.seed * 2);
-      f.light.intensity = f.base * v;
+      if (f.light) f.light.intensity = f.base * v;
       f.flame.scale.set(0.45 + v * 0.1, 0.7 + v * 0.2, 1);
     }
     this.fogPlanes.forEach((f, i) => {

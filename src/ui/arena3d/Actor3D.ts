@@ -135,7 +135,7 @@ export class Actor3D {
   private owned: THREE.Material[] = [];
   private handR: THREE.Object3D | null = null;
   private chestBone: THREE.Object3D | null = null;
-  private glowLight: THREE.PointLight;
+  private glowLight: THREE.PointLight | null = null;
   private aura: THREE.Mesh;
   readonly height: number;
   /** half the body's depth along its facing, for spacing and lunges */
@@ -145,7 +145,7 @@ export class Actor3D {
   private procState: Proc | null = null;
   private deathSide = 1;
 
-  constructor(look: ActorLook) {
+  constructor(look: ActorLook, opts: { glowLight?: boolean } = {}) {
     const sf = look.sf && isSf(look.sf) && sfReady(look.sf) ? look.sf : null;
     this.realistic = !!sf;
     let clips: THREE.AnimationClip[];
@@ -196,9 +196,11 @@ export class Actor3D {
     if (sf) this.attachSfWeapon();
     else this.setupHeldItems(look);
 
-    this.glowLight = new THREE.PointLight(0xffffff, 0, Math.max(3.5, this.height * 2.2), 2);
-    this.glowLight.position.set(0, this.height * 0.75, Math.max(0.6, this.reach * 0.8));
-    this.root.add(this.glowLight);
+    if (opts.glowLight !== false) {
+      this.glowLight = new THREE.PointLight(0xffffff, 0, Math.max(3.5, this.height * 2.2), 2);
+      this.glowLight.position.set(0, this.height * 0.75, Math.max(0.6, this.reach * 0.8));
+      this.root.add(this.glowLight);
+    }
     // telegraph aura on the ground under the fighter
     const r = Math.max(0.6, this.reach * 1.1);
     this.aura = new THREE.Mesh(new THREE.RingGeometry(r * 0.55, r, 48), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
@@ -441,8 +443,10 @@ export class Actor3D {
       m.emissive.setHex(color);
       m.emissiveIntensity = amount * k;
     }
-    this.glowLight.color.setHex(color);
-    this.glowLight.intensity = amount * (this.tune ? 22 : 9);
+    if (this.glowLight) {
+      this.glowLight.color.setHex(color);
+      this.glowLight.intensity = amount * (this.tune ? 22 : 9);
+    }
     const am = this.aura.material as THREE.MeshBasicMaterial;
     am.color.setHex(color);
     am.opacity = Math.min(0.9, amount * 0.85);
@@ -478,6 +482,6 @@ export class Actor3D {
     for (const m of this.owned) m.dispose();
     this.aura.geometry.dispose();
     (this.aura.material as THREE.Material).dispose();
-    this.glowLight.dispose();
+    this.glowLight?.dispose();
   }
 }
